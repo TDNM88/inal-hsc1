@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Cho phép truy cập cross-origin từ ngrok và các địa chỉ IP local
+  experimental: {
+    allowedDevOrigins: ["localhost", "192.168.1.4", "*"]
+  },
   reactStrictMode: true,
   // Configuration from next.config.mjs
   eslint: {
@@ -16,15 +20,11 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NODE_ENV === 'production'
-          ? 'https://inal-hsc-api.vercel.app/api/:path*'
-          : 'http://localhost:3000/api/:path*'
+        destination: 'https://inal-hsc-api.vercel.app/api/:path*'
       },
       {
         source: '/ws/:path*',
-        destination: process.env.NODE_ENV === 'production'
-          ? 'https://inal-hsc-api.vercel.app/:path*'
-          : 'http://localhost:3000/:path*'
+        destination: 'https://inal-hsc-api.vercel.app/:path*'
       }
     ];
   },
