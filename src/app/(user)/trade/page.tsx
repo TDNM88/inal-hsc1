@@ -109,7 +109,7 @@ export default function TradePage() {
   };
 
   const generateSessionId = (time: Date): string => {
-    return `${time.getFullYear()}-${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')}_${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+    return `${time.getFullYear()}-${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')}-${String(time.getHours()).padStart(2, '0')}-${String(time.getMinutes()).padStart(2, '0')}`;
   };
 
   const handleLogout = () => {
@@ -142,26 +142,22 @@ export default function TradePage() {
         return;
       }
       try {
-        // Đảm bảo API_BASE_URL được định nghĩa
         if (!API_BASE_URL) {
           console.error('API_BASE_URL không được định nghĩa, không thể kết nối WebSocket');
           return;
         }
 
-        // Tạo WebSocket URL an toàn hơn
         let wsUrl = '';
         if (API_BASE_URL.startsWith('https://')) {
           wsUrl = `wss://${API_BASE_URL.replace('https://', '')}/ws`;
         } else if (API_BASE_URL.startsWith('http://')) {
           wsUrl = `ws://${API_BASE_URL.replace('http://', '')}/ws`;
         } else {
-          // Fallback cho môi trường phát triển
           wsUrl = `ws://${window.location.hostname}:${window.location.port || '3000'}/ws`;
         }
 
         console.log(`Đang kết nối WebSocket đến: ${wsUrl}`);
         
-        // Xử lý lỗi khi tạo WebSocket
         const ws = new WebSocket(wsUrl);
         ws.onopen = () => {
           console.log('WebSocket connected');
@@ -188,15 +184,11 @@ export default function TradePage() {
           const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts));
           setTimeout(connectWebSocket, delay);
         };
-        ws.onerror = (error) => {
-          // Cải thiện xử lý lỗi WebSocket
+       ws.onerror = (error) => {
           console.error('WebSocket error:', error);
-          
-          // Nếu đang ở chế độ development với mock data, không hiển thị lỗi
           if (USE_MOCK_DATA) {
             console.log('Đang ở chế độ mock data, bỏ qua lỗi WebSocket');
           } else {
-            // Chỉ hiện toast lỗi nếu không phải mock mode
             toast({ 
               variant: 'destructive', 
               title: 'Lỗi kết nối', 
@@ -224,13 +216,11 @@ export default function TradePage() {
       const now = new Date();
       setCurrentTime(now);
       
-      // Tính toán countdown theo cách của trang admin (59 - giây hiện tại)
       const countdownValue = 59 - now.getSeconds();
       setCountdown(countdownValue);
       setTimeLeft(countdownValue);
       
       if (currentSession && currentSession.startTime !== 'N/A') {
-        // Kiểm tra nếu countdown = 0 và phiên đang chờ kết quả
         if (countdownValue === 0 && currentSession.status === 'pending' && !currentSession.result) {
           fetchSessionResult(currentSession.sessionId);
         }
@@ -283,7 +273,7 @@ export default function TradePage() {
           });
           setTradeHistory(prev =>
             prev.map(item => {
-              if (item.session.toString() === sessionId.split('_')[1].replace(':', '')) {
+              if (item.session.toString() === sessionId.split('-')[3] + sessionId.split('-')[4]) {
                 const isWin = item.direction === result;
                 return {
                   ...item,
@@ -295,7 +285,7 @@ export default function TradePage() {
             })
           );
           const relevantTrades = tradeHistory.filter(t =>
-            t.session.toString() === sessionId.split('_')[1].replace(':', '')
+            t.session.toString() === sessionId.split('-')[3] + sessionId.split('-')[4]
           );
           relevantTrades.forEach(trade => {
             const isWin = trade.direction === result;
@@ -502,13 +492,12 @@ export default function TradePage() {
         const tradeId = Date.now();
         const newHistoryItem: TradeHistoryRecord = {
           id: tradeId,
-          session: parseInt(currentSession.sessionId.split('_')[1].replace(':', '') || '0'),
+          session: parseInt(currentSession.sessionId.split('-')[3] + currentSession.sessionId.split('-')[4]),
           direction: selectedAction,
           amount: amountNum,
           status: "pending",
           profit: 0
         };
-        // Giới hạn lịch sử giao dịch chỉ hiển thị 30 lệnh gần nhất
         setTradeHistory(prev => [newHistoryItem, ...prev].slice(0, 30));
         setBalance(prev => prev - amountNum);
         toast({ title: 'Thành công', description: 'Đặt lệnh thành công' });
@@ -538,7 +527,7 @@ export default function TradePage() {
       const tradeId = Date.now();
       const newHistoryItem: TradeHistoryRecord = {
         id: tradeId,
-        session: parseInt(currentSession.sessionId.split('_')[1].replace(':', '')),
+        session: parseInt(currentSession.sessionId.split('-')[3] + currentSession.sessionId.split('-')[4]),
         direction: selectedAction,
         amount: amountNum,
         status: "pending",
@@ -641,7 +630,7 @@ export default function TradePage() {
                   </Button>
                   <Button
                     type="button"
-                    className={`flex-1 ${selectedAction === "UP" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
+                    className={`flex-1 ${selectedAction === "UP" ? "bg-green-600 hover a-green-700" : "bg-red-600 hover:bg-red-700"}`}
                     onClick={confirmTrade}
                   >
                     Xác nhận
@@ -701,7 +690,7 @@ export default function TradePage() {
                         <Button variant="outline" size="icon" onClick={() => addAmount(100000)}>
                           <Plus className="h-4 w-4" />
                         </Button>
-                      </div>
+                      </div !!!
                       <div className="grid grid-cols-3 gap-2 mt-2">
                         {QUICK_AMOUNTS.map((value) => (
                           <Button
