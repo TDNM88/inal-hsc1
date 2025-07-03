@@ -771,55 +771,134 @@ function TradingSessionsPage({ token }: any) {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const sessionsPerPage = 10;
+  const [countdown, setCountdown] = useState(0);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // State để lưu trữ dữ liệu các phiên
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [currentSession, setCurrentSession] = useState<any>({ sessionId: 'N/A', result: 'Chưa có', startTime: 'N/A', endTime: 'N/A' });
+  const [futureSessions, setFutureSessions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const { data, isLoading, mutate } = useSWR(
-    token ? `/api/sessions?page=${currentPage}&limit=${sessionsPerPage}` : null,
-    url => fetcher(url, token),
-    { refreshInterval: 5000 }
-  );
+  // Hàm tạo kết quả ngẫu nhiên (Lên hoặc Xuống)
+  const generateRandomResult = () => {
+    return Math.random() > 0.5 ? 'Lên' : 'Xuống';
+  };
 
-  const sessions = data?.sessions || [];
-  const totalPages = data?.total ? Math.ceil(data.total / sessionsPerPage) : 1;
-  const currentSession = sessions[0] || { sessionId: 'N/A', result: 'Chưa có', startTime: 'N/A', endTime: 'N/A' };
-  const [countdown, setCountdown] = useState(59);
+  // Hàm tạo ID phiên từ thời gian
+  const generateSessionId = (time: Date) => {
+    return `${time.getFullYear()}-${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')}_${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+  };
 
+  // Hàm khởi tạo 30 phiên tương lai với kết quả ngẫu nhiên
+  const generateFutureSessions = (startFromTime: Date) => {
+    const sessions = [];
+    let currentMin = startFromTime.getMinutes();
+    let currentHour = startFromTime.getHours();
+    let currentDay = startFromTime.getDate();
+    let currentMonth = startFromTime.getMonth();
+    let currentYear = startFromTime.getFullYear();
+    
+    for (let i = 0; i < 30; i++) {
+      currentMin++;
+      if (currentMin >= 60) {
+        currentMin = 0;
+        currentHour++;
+        if (currentHour >= 24) {
+          currentHour = 0;
+          currentDay++;
+          // Giả định đơn giản, không xử lý chuyển tháng/năm
+        }
+      }
+      
+      const startTime = new Date(currentYear, currentMonth, currentDay, currentHour, currentMin, 0);
+      const endTime = new Date(currentYear, currentMonth, currentDay, currentHour, currentMin, 59);
+      
+      sessions.push({
+        sessionId: generateSessionId(startTime),
+        result: generateRandomResult(),
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        status: 'scheduled'
+      });
+    }
+    
+    return sessions;
+  };
+  
+  // Cập nhật thời gian hiện tại và đồng hồ đếm ngược
   useEffect(() => {
     const timer = setInterval(() => {
-      setCountdown((prev) => (prev <= 0 ? 59 : prev - 1));
+      const now = new Date();
+      setCurrentTime(now);
+      // Tính toán số giây còn lại trong phiên hiện tại
+      setCountdown(59 - now.getSeconds());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
+  
+  // Cập nhật dữ liệu phiên khi thời gian thay đổi
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3000/trade');
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'sessionUpdate') {
-        toast({ title: 'Cập nhật phiên', description: `Phiên ${message.sessionId} đã kết thúc: ${message.result}` });
-        mutate();
-      }
-    };
-    return () => ws.close();
-  }, [toast, mutate]);
-
-  const updateSessionResult = async (sessionId: string, result: 'Lên' | 'Xuống') => {
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ result }),
-      });
-      const resultData = await res.json();
-      if (res.ok) {
-        toast({ title: 'Thành công', description: `Kết quả phiên ${resultData.sessionId} đã được cập nhật` });
-        mutate();
-      } else {
-        toast({ variant: 'destructive', title: 'Lỗi', description: resultData.message });
-      }
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể cập nhật kết quả' });
+    const now = new Date();
+    
+    // Tạo thông tin về phiên hiện tại
+    const currentSessionStartTime = new Date(
+      now.getFullYear(), 
+      now.getMonth(), 
+      now.getDate(), 
+      now.getHours(), 
+      now.getMinutes(), 
+      0
+    );
+    
+    const currentSessionEndTime = new Date(
+      now.getFullYear(), 
+      now.getMonth(), 
+      now.getDate(), 
+      now.getHours(), 
+      now.getMinutes(), 
+      59
+    );
+    
+    // Kiểm tra nếu phút hiện tại khác với phút của phiên hiện tại
+    // nghĩa là phiên đã thay đổi
+    if (currentSession.sessionId !== generateSessionId(now)) {
+      // Tạo phiên hiện tại mới
+      const newCurrentSession = {
+        sessionId: generateSessionId(now),
+        result: generateRandomResult(), // Kết quả ngẫu nhiên
+        startTime: currentSessionStartTime.toISOString(),
+        endTime: currentSessionEndTime.toISOString(),
+        status: 'active'
+      };
+      
+      setCurrentSession(newCurrentSession);
+      
+      // Tạo lại 30 phiên tương lai
+      const newFutureSessions = generateFutureSessions(now);
+      setFutureSessions(newFutureSessions);
+      
+      // Gộp phiên hiện tại và các phiên tương lai để hiển thị
+      setSessions([newCurrentSession, ...newFutureSessions.slice(0, sessionsPerPage - 1)]);
+      
+      // Tính tổng số trang
+      setTotalPages(Math.ceil((1 + newFutureSessions.length) / sessionsPerPage));
+      setIsLoading(false);
     }
-  };
+  }, [currentTime, currentSession.sessionId]);
+  
+  // Xử lý thay đổi trang
+  useEffect(() => {
+    if (currentPage === 1) {
+      // Trang 1: Phiên hiện tại + các phiên tương lai đầu tiên
+      setSessions([currentSession, ...futureSessions.slice(0, sessionsPerPage - 1)]);
+    } else {
+      // Các trang khác: Chỉ hiển thị phiên tương lai tương ứng
+      const startIndex = (currentPage - 1) * sessionsPerPage - 1;
+      setSessions(futureSessions.slice(startIndex, startIndex + sessionsPerPage));
+    }
+  }, [currentPage, currentSession, futureSessions]);
 
   return (
     <div>
@@ -835,7 +914,7 @@ function TradingSessionsPage({ token }: any) {
               <div className="text-lg font-semibold text-white">Phiên: {currentSession.sessionId}</div>
               <div className="text-3xl font-bold text-red-500">{countdown}s</div>
               <div className="text-sm text-white">
-                Kết quả: <span className="font-semibold text-green-600">{currentSession.result}</span>
+                Kết quả: <span className={`font-semibold ${currentSession.result === 'Lên' ? 'text-green-600' : 'text-red-600'}`}>{currentSession.result}</span>
               </div>
             </div>
           </CardContent>
@@ -856,7 +935,7 @@ function TradingSessionsPage({ token }: any) {
                   <TableHead className="text-white">Kết quả</TableHead>
                   <TableHead className="text-white">Thời gian bắt đầu</TableHead>
                   <TableHead className="text-white">Thời gian kết thúc</TableHead>
-                  <TableHead className="text-white">Hành động</TableHead>
+                  <TableHead className="text-white">Trạng thái</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -865,29 +944,27 @@ function TradingSessionsPage({ token }: any) {
                     <TableCell className="text-white font-medium">{session.sessionId}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={session.result === 'Lên' ? 'default' : session.result === 'Xuống' ? 'destructive' : 'secondary'}
+                        variant={session.result === 'Lên' ? 'default' : 'destructive'}
                         className={
                           session.result === 'Lên' ? 'bg-green-500 hover:bg-green-500' :
-                          session.result === 'Xuống' ? 'bg-red-500 hover:bg-red-500' : 'bg-gray-500 hover:bg-gray-500'
+                          'bg-red-500 hover:bg-red-500'
                         }
                       >
-                        {session.result || 'Chưa có'}
+                        {session.result}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-gray-400">{new Date(session.startTime).toLocaleString()}</TableCell>
                     <TableCell className="text-gray-400">{new Date(session.endTime).toLocaleString()}</TableCell>
                     <TableCell>
-                      {session.status === 'pending' && (
-                        <Select onValueChange={(value) => updateSessionResult(session._id, value as 'Lên' | 'Xuống')}>
-                          <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                            <SelectValue placeholder="Chọn kết quả" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                            <SelectItem value="Lên">Lên</SelectItem>
-                            <SelectItem value="Xuống">Xuống</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <Badge
+                        variant={session.status === 'active' ? 'default' : 'secondary'}
+                        className={
+                          session.status === 'active' ? 'bg-blue-500 hover:bg-blue-500' :
+                          'bg-gray-500 hover:bg-gray-500'
+                        }
+                      >
+                        {session.status === 'active' ? 'Đang diễn ra' : 'Đã lên lịch'}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 ))}

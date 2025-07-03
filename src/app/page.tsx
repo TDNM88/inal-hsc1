@@ -162,23 +162,19 @@ export default function Landing() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center space-x-2">
-              <img src="https://ssi-one.vercel.app/_next/image?url=%2Flogo.png&w=384&q=75" alt="London HSC" className="h-8 w-auto" />
-              <span className="text-lg font-bold text-blue-600">LONDON HSC</span>
+              <img src="/logo.png" alt="London HSC" className="h-20 w-auto" />
             </div>
 
             {/* Navigation */}
             <nav className="hidden md:flex items-center space-x-6">
-              <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+              <a href="/" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Trang chủ
               </a>
-              <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+              <a href="/trade" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Giao dịch
               </a>
-              <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+              <a href="/" className="text-gray-600 hover:text-blue-600 transition-colors">
                 Tin tức
-              </a>
-              <a href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Về chúng tôi
               </a>
             </nav>
 
@@ -192,7 +188,11 @@ export default function Landing() {
               >
                 Đăng nhập
               </Button>
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button
+                size="sm" 
+                onClick={() => router.push("/register")}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
                 Mở tài khoản
               </Button>
             </div>
@@ -216,7 +216,7 @@ export default function Landing() {
             <div
               className="mb-6 bg-cover bg-center bg-no-repeat rounded-lg shadow-md h-48"
               style={{
-                backgroundImage: "url(https://ssi-one.vercel.app/_next/image?url=%2Fslide1.jpg&w=384&q=75)",
+                backgroundImage: "url(/slide1.jpg)",
               }}
             >
               <div className="w-full h-full bg-black bg-opacity-30 rounded-lg flex items-end p-4">
@@ -313,7 +313,7 @@ export default function Landing() {
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <motion.img
-            src="https://ssi-one.vercel.app/_next/image?url=%2Fslide1-BDdyI_u-.jpg"
+            src="/slide1-BDdyI_u-.jpg"
             alt="London HSC Trading Floor"
             className="w-full h-64 object-cover rounded-lg shadow-lg"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -321,7 +321,7 @@ export default function Landing() {
             transition={{ duration: 0.5 }}
           />
           <motion.img
-            src="https://ssi-one.vercel.app/_next/image?url=%2Fslide2-B_YnZUXI.jpg"
+            src="/slide2-B_YnZUXI.jpg"
             alt="Financial Markets"
             className="w-full h-64 object-cover rounded-lg shadow-lg"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -345,7 +345,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div>
               <img
-                src="https://ssi-one.vercel.app/_next/image?url=%2Fwisdomtree-banner.png"
+                src="/wisdomtree-banner.png"
                 alt="WisdomTree Partnership Banner"
                 className="rounded-lg shadow-lg w-full h-auto"
               />
@@ -363,7 +363,7 @@ export default function Landing() {
                 động kinh doanh ETF của nó được thành lập vào năm 2006.
               </p>
               <Button className="bg-white text-blue-900 hover:bg-gray-100 font-semibold">Tìm hiểu thêm</Button>
-            </div>
+            </div>  
           </div>
         </div>
       </motion.div>
@@ -397,7 +397,7 @@ export default function Landing() {
             </div>
             <div>
               <img
-                src="https://ssi-one.vercel.app/_next/image?url=%2Fss.jpg"
+                src="/ss.jpg"
                 alt="Ho Chi Minh City Skyline"
                 className="rounded-lg shadow-xl w-full h-auto object-cover"
               />
@@ -417,17 +417,17 @@ export default function Landing() {
           <h3 className="text-2xl font-bold text-center mb-8 text-purple-900">Hình ảnh hoạt động</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <img
-              src="https://ssi-one.vercel.app/_next/image?url=%2Fgallery2.jpg"
+              src="/gallery2.jpg"
               alt="London Stock Exchange Building"
               className="w-full h-48 object-cover rounded-lg shadow-md hover:shadow-lg transition-shadow"
             />
             <img
-              src="https://ssi-one.vercel.app/_next/image?url=%2Fgallery3.jpg"
+              src="/gallery3.jpg"
               alt="Trading Floor Activities"
               className="w-full h-48 object-cover rounded-lg shadow-md hover:shadow-lg transition-shadow"
             />
             <img
-              src="https://ssi-one.vercel.app/_next/image?url=%2Fgallery4.jpg"
+              src="/gallery4.jpg"
               alt="Financial District View"
               className="w-full h-48 object-cover rounded-lg shadow-md hover:shadow-lg transition-shadow"
             />
@@ -446,32 +446,32 @@ export default function Landing() {
               {
                 name: "Emmanuel Cau, CFA",
                 role: "Giám đốc Sở giao dịch chứng khoán châu Âu, Barclays",
-                image: "https://ssi-one.vercel.app/_next/image?url=%2Fexperts/1.jpg",
+                image: "/experts/1.jpg",
               },
               {
                 name: "Emmanuel CAU",
                 role: "Chargé de Communication Marketing",
-                image: "https://ssi-one.vercel.app/_next/image?url=%2Fexperts/2.jpg",
+                image: "/experts/2.jpg",
               },
               {
                 name: "MERAV OZAIR, TIẾN SĨ",
                 role: "Tương lai của tài chính: AI đáp ứng được token hóa",
-                image: "https://ssi-one.vercel.app/_next/image?url=%2Fexperts/3.jpg",
+                image: "/experts/3.jpg",
               },
               {
                 name: "Comunidade CFA – Eu me Banco",
                 role: "Chuyên gia hoạt động như các nhà phân tích tài chính",
-                image: "https://ssi-one.vercel.app/_next/image?url=%2Fexperts/4.jpg",
+                image: "/experts/4.jpg",
               },
               {
                 name: "RICHARD SAINTVILUS",
                 role: "AI sáng tạo xông vào điện toán đám mây",
-                image: "https://ssi-one.vercel.app/_next/image?url=%2Fexperts/5.jpg",
+                image: "/experts/5.jpg",
               },
               {
                 name: "RICHARD TESLA",
                 role: "Tại sao ĐÃ đến lúc Mua Cổ phiếu Tesla",
-                image: "https://ssi-one.vercel.app/_next/image?url=%2Fexperts/6.jpg",
+                image: "/experts/6.jpg",
               },
             ].map((expert, index) => (
               <motion.div
@@ -501,7 +501,7 @@ export default function Landing() {
         <div className="container mx-auto px-4 text-center">
           <h3 className="text-2xl font-bold mb-6 text-gray-800">Sự kiện đặc biệt</h3>
           <img
-            src="https://ssi-one.vercel.app/_next/image?url=%2Fphosagro-anniversary.jpg"
+            src="/phosagro-anniversary.jpg"
             alt="PhosAgro Anniversary Event"
             className="mx-auto rounded-lg shadow-lg max-w-2xl w-full"
           />

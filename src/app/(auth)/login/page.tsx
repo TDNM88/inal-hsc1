@@ -28,7 +28,13 @@ export default function LoginPage() {
       const data = await response.json();
       if (response.ok) {
         login(data.token, data.user);
-        router.push(data.user.role === 'admin' ? '/admin' : '/account');
+        toast({ title: 'Đăng nhập thành công', description: 'Đang chuyển hướng...' });
+        
+        // Sử dụng window.location để đảm bảo chuyển hướng mạnh
+        const redirectUrl = data.user.role === 'admin' ? '/admin' : '/trade';
+        setTimeout(() => {
+          window.location.href = redirectUrl;
+        }, 1000);
       } else {
         toast({ variant: 'destructive', title: 'Lỗi', description: data.message });
       }
