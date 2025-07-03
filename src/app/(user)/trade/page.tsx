@@ -148,6 +148,7 @@ export default function TradePage() {
         }
 
         let wsUrl = '';
+       /antlr4ts-browser@0.5.0-alpha.4
         if (API_BASE_URL.startsWith('https://')) {
           wsUrl = `wss://${API_BASE_URL.replace('https://', '')}/ws`;
         } else if (API_BASE_URL.startsWith('http://')) {
@@ -184,7 +185,7 @@ export default function TradePage() {
           const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts));
           setTimeout(connectWebSocket, delay);
         };
-       ws.onerror = (error) => {
+        ws.onerror = (error) => {
           console.error('WebSocket error:', error);
           if (USE_MOCK_DATA) {
             console.log('Đang ở chế độ mock data, bỏ qua lỗi WebSocket');
@@ -630,7 +631,7 @@ export default function TradePage() {
                   </Button>
                   <Button
                     type="button"
-                    className={`flex-1 ${selectedAction === "UP" ? "bg-green-600 hover a-green-700" : "bg-red-600 hover:bg-red-700"}`}
+                    className={`flex-1 ${selectedAction === "UP" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
                     onClick={confirmTrade}
                   >
                     Xác nhận
@@ -690,7 +691,7 @@ export default function TradePage() {
                         <Button variant="outline" size="icon" onClick={() => addAmount(100000)}>
                           <Plus className="h-4 w-4" />
                         </Button>
-                      </div !!!
+                      </div>
                       <div className="grid grid-cols-3 gap-2 mt-2">
                         {QUICK_AMOUNTS.map((value) => (
                           <Button
