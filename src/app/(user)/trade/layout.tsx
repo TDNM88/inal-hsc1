@@ -1,22 +1,40 @@
-import { Metadata, Viewport } from 'next';
-import ClientTradeLayout from './client-layout';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Giao dịch - London SSI',
-};
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1.0,
-};
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/useAuth';
+import { Button } from '@/components/ui/button';
+import { User, LogOut } from 'lucide-react';
 
 export default function TradeLayout({ children }: { children: React.ReactNode }) {
-  // Server component wrapper to apply metadata
-  // Wrap children in ClientTradeLayout để có xác thực
+  const router = useRouter();
+  const { isAuthenticated, isLoading, user, logout } = useAuth();
+
+  // Function to handle logout
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  // Only render the layout if authenticated
+  if (!isAuthenticated()) {
+    return null;
+  }
+
   return (
-    <ClientTradeLayout>
-      {/* Không bọc children trong container nào khác */}
-      {children}
-    </ClientTradeLayout>
+    <div className="min-h-screen bg-white">
+      <div className="p-4 md:p-8">
+        {children}
+      </div>
+    </div>
   );
 }

@@ -3,45 +3,56 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import UserMenu from '@/components/user-menu';
+import { Button } from '@/components/ui/button';
+import { User, LogOut } from 'lucide-react';
 
-export default function UserLayout({ children }: { children: React.ReactNode }) {
+export default function TradeLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user, logout } = useAuth();
 
-  // Redirect to login if not authenticated
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated()) {
       router.push('/login');
     }
   }, [isLoading, isAuthenticated, router]);
 
-  // Show loading state while checking authentication
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
-  // Only render the layout if authenticated
   if (!isAuthenticated()) {
     return null;
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto py-6 px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1">
-            <UserMenu user={user} logout={logout} />
-          </div>
-          <div className="lg:col-span-3">
-            {children}
-          </div>
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center text-black">
+          <User className="h-6 w-6 mr-2" />
+          <div>{user?.name || user?.email || 'User'}</div>
         </div>
+        <Button
+          variant="outline"
+          className="text-black border-gray-600 hover:bg-gray-700"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-5 w-5 mr-2" />
+          Đăng xuất
+        </Button>
       </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {children}
+      </main>
     </div>
   );
 }
