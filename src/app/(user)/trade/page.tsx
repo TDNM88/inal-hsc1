@@ -17,7 +17,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-// Layout đã được loại bỏ
 import TradingViewSymbolOverview from "@/components/TradingViewSymbolOverview";
 import TradingViewAdvancedChart from "@/components/TradingViewAdvancedChart";
 import LiquidityTable from "@/components/LiquidityTable";
@@ -25,7 +24,7 @@ import TradingViewTickerTape from "@/components/TradingViewTickerTape";
 
 // Constants
 const QUICK_AMOUNTS = [100000, 1000000, 5000000, 10000000, 30000000, 50000000, 100000000, 200000000];
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'; // Update this to your API URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // Define types
 interface Session {
@@ -126,7 +125,7 @@ export default function TradePage() {
     });
   };
 
-  // Generate session ID from time (for fallback purposes)
+  // Generate session ID from time
   const generateSessionId = (time: Date): string => {
     return `${time.getFullYear()}-${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')}_${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
   };
@@ -138,37 +137,30 @@ export default function TradePage() {
       toast({ variant: 'destructive', title: 'Vui lòng đăng nhập để sử dụng tính năng này' });
     }
     
-    // Update balance if user data is available
     if (user && user.balance) {
       setBalance(user.balance);
     }
     
-    // Fetch and initialize data when component mounts
     if (token && user) {
       fetchSessions();
       setTradeHistory([]);
     }
-  }, [token, user]);
+  }, [token, user, loading, router, toast]);
 
   // Initialize WebSocket connection
   useEffect(() => {
     if (!user || !token) return;
     
-    // Biến để kiểm soát số lần thử kết nối
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 3;
     
     const connectWebSocket = () => {
-      // Nếu đã thử kết nối quá nhiều lần, dừng lại
       if (reconnectAttempts >= maxReconnectAttempts) {
         console.log('Đã thử kết nối WebSocket nhiều lần không thành công. Đang tạm dừng kết nối.');
         return;
       }
       
       try {
-        // Kiểm tra nếu đang ở môi trường phát triển (localhost)
-        const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        
         const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws`;
         console.log(`Đang kết nối WebSocket đến: ${wsUrl}`);
         
@@ -176,9 +168,8 @@ export default function TradePage() {
         
         ws.onopen = () => {
           console.log('WebSocket connected');
-          reconnectAttempts = 0; // Reset số lần thử kết nối
+          reconnectAttempts = 0;
           
-          // Authenticate the WebSocket connection
           if (token) {
             ws.send(JSON.stringify({ type: 'auth', token }));
           }
@@ -202,7 +193,6 @@ export default function TradePage() {
           console.log('WebSocket disconnected, trying to reconnect...');
           reconnectAttempts++;
           
-          // Tăng thời gian chờ sau mỗi lần thử
           const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts));
           setTimeout(connectWebSocket, delay);
         };
@@ -242,9 +232,7 @@ export default function TradePage() {
         setCountdown(secondsLeft);
         setTimeLeft(secondsLeft);
         
-        // Check if session has ended but we don't have a result yet
         if (secondsLeft === 0 && currentSession.status === 'pending' && !currentSession.result) {
-          // Session has ended, try to get the result
           fetchSessionResult(currentSession.sessionId);
         }
       }
@@ -257,44 +245,34 @@ export default function TradePage() {
   const handleSessionUpdate = (data: any) => {
     const { sessionId, result, status } = data;
     
-    // If this is about the current session
     if (currentSession.sessionId === sessionId) {
       if (status === 'completed' && result) {
-        // Current session has completed with a result
         const updatedSession = { ...currentSession, result, status };
         setCurrentSession(updatedSession);
         handlePayout(updatedSession);
         
-        // Move to next session if available
         if (futureSessions.length > 0) {
           const [nextSession, ...remainingSessions] = futureSessions;
           setCurrentSession(nextSession);
           setFutureSessions(remainingSessions);
           
-          // Add the completed session to past sessions
-          setPastSessions(prev => [updatedSession, ...prev].slice(0, 20)); // Keep last 20 sessions
+          setPastSessions(prev => [updatedSession, ...prev].slice(0, 20));
         }
       }
-    } 
-    // If this is about a future session
-    else if (futureSessions.some(session => session.sessionId === sessionId)) {
+    } else if (futureSessions.some(session => session.sessionId === sessionId)) {
       setFutureSessions(prev => 
         prev.map(session => 
           session.sessionId === sessionId ? { ...session, result, status } : session
         )
       );
-    }
-    // If this is about a past session
-    else if (pastSessions.some(session => session.sessionId === sessionId)) {
+    } else if (pastSessions.some(session => session.sessionId === sessionId)) {
       setPastSessions(prev => 
         prev.map(session => 
           session.sessionId === sessionId ? { ...session, result, status } : session
         )
       );
-    }
-    // This could be a new session we don't know about yet
-    else {
-      fetchSessions(); // Refresh our session data
+    } else {
+      fetchSessions();
     }
   };
 
@@ -315,7 +293,6 @@ export default function TradePage() {
       const session = await response.json();
       
       if (session.result && session.status === 'completed') {
-        // Update current session if it's still the same
         if (currentSession.sessionId === sessionId) {
           handleSessionUpdate({ 
             sessionId, 
@@ -333,21 +310,18 @@ export default function TradePage() {
   const fetchSessions = async () => {
     setIsLoading(true);
     try {
-      // Kiểm tra kết nối mạng
       if (!navigator.onLine) {
         console.log('Offline mode detected, using mock data');
         return useMockSessions();
       }
       
-      // Kiểm tra token
       if (!token) {
         console.error('No auth token available');
         return useMockSessions();
       }
       
-      // Fetch all sessions with timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 giây timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       const response = await fetch(`${API_BASE_URL}/api/sessions`, {
         headers: {
@@ -362,117 +336,178 @@ export default function TradePage() {
       const sessions = await response.json();
       const now = new Date();
       
-      // Process sessions to determine current, completed, and upcoming sessions
       processSessionData(sessions, now);
       
       return sessions;
     } catch (error) {
       console.error('Error in fetchSessions:', error);
       setError('Không thể tải phiên giao dịch. Vui lòng thử lại sau.');
-      // Sử dụng dữ liệu giả để tránh lỗi UI
       return useMockSessions();
-  } catch (error) {
-    console.error('Error in fetchSessions:', error);
-    setError('Không thể tải phiên giao dịch. Vui lòng thử lại sau.');
-    // Sử dụng dữ liệu giả để tránh lỗi UI
-    return useMockSessions();
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-// ...
-
-// Tạo dữ liệu giả cho phiên giao dịch
-const useMockSessions = (): Session[] => {
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
-  
-  // Tạo 12 phiên giao dịch, mỗi phiên cách nhau 10 phút
-  const mockSessions: Session[] = [];
-  
-  // Tạo ID cho session
-  const generateSessionId = (time: Date): string => {
-    return `session_${time.getHours()}:${time.getMinutes()}_${time.getDate()}${time.getMonth() + 1}`;
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  for (let i = 0; i < 12; i++) {
-    const sessionStart = new Date(startOfDay.getTime() + i * 10 * 60 * 1000);
-    const sessionEnd = new Date(sessionStart.getTime() + 10 * 60 * 1000);
-    const isPast = sessionEnd < now;
-    const isCurrent = sessionStart <= now && sessionEnd >= now;
+  // Mock sessions for offline mode
+  const useMockSessions = (): Session[] => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
     
-    const session: Session = {
-      sessionId: generateSessionId(sessionStart),
-      startTime: sessionStart,
-      endTime: sessionEnd,
-      status: isPast ? 'completed' : isCurrent ? 'running' : 'upcoming',
-      result: isPast ? (Math.random() > 0.5 ? 'UP' : 'DOWN') : null
-    };
+    const mockSessions: Session[] = [];
     
-    mockSessions.push(session);
-  }
-  
-  // Process and update states
-  processSessionData(mockSessions, now);
-  
-  return mockSessions;
-};
-
-// Handle action (UP/DOWN)
-const handleAction = (type: "UP" | "DOWN") => {
-  const betAmount = Number(amount.replace(/,/g, ""));
-  if (!betAmount || isNaN(betAmount)) {
-    toast({ variant: "destructive", title: "Lỗi", description: "Vui lòng nhập số tiền hợp lệ" });
-    return;
-  }
-  if (betAmount < 100000) {
-    toast({ variant: "destructive", title: "Lỗi", description: "Số tiền tối thiểu là 100,000 VND" });
-    return;
-  }
-  if (user && betAmount > balance) {
-    toast({ variant: "destructive", title: "Lỗi", description: "Số dư không đủ" });
-    return;
-  }
-  setSelectedAction(type);
-  setIsConfirming(true);
-};
-
-// ...
-
-const confirmTrade = async () => {
-  if (!selectedAction || !user || !token || !currentSession) return;
-  
-  const amountNum = Number(amount.replace(/,/g, ""));
-  
-  try {
-    setIsLoading(true);
+    for (let i = 0; i < 12; i++) {
+      const sessionStart = new Date(startOfDay.getTime() + i * 10 * 60 * 1000);
+      const sessionEnd = new Date(sessionStart.getTime() + 10 * 60 * 1000);
+      const isPast = sessionEnd < now;
+      const isCurrent = sessionStart <= now && sessionEnd >= now;
+      
+      const session: Session = {
+        sessionId: generateSessionId(sessionStart),
+        startTime: sessionStart,
+        endTime: sessionEnd,
+        status: isPast ? 'completed' : isCurrent ? 'running' : 'upcoming',
+        result: isPast ? (Math.random() > 0.5 ? 'UP' : 'DOWN') : null
+      };
+      
+      mockSessions.push(session);
+    }
     
-    // Place order via API
-    const response = await fetch(`${API_BASE_URL}/api/orders`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        sessionId: currentSession.sessionId,
-        amount: amountNum,
-        type: selectedAction,
-        userId: user.id
-      })
+    return processSessionData(mockSessions, now);
+  };
+  
+  // Process session data
+  const processSessionData = (sessions: Session[], now: Date): Session[] => {
+    const processed = sessions.map(session => {
+      const startTime = session.startTime instanceof Date ? session.startTime : new Date(session.startTime || Date.now());
+      const endTime = session.endTime ? (session.endTime instanceof Date ? session.endTime : new Date(session.endTime)) : new Date(startTime.getTime() + 10 * 60000);
+      
+      let status: string;
+      if (startTime > now) {
+        status = 'upcoming';
+      } else if (now >= startTime && now < endTime) {
+        status = 'running';
+      } else {
+        status = 'completed';
+      }
+      
+      return {
+        ...session,
+        startTime,
+        endTime,
+        status
+      };
     });
     
-    if (!response.ok) {
-      throw new Error('Failed to place order');
+    const running = processed.filter(session => session.status === 'running');
+    const completed = processed.filter(session => session.status === 'completed');
+    const upcoming = processed.filter(session => session.status === 'upcoming');
+    
+    setSessions(processed);
+    setPastSessions(completed);
+    setCurrentSession(running[0] || { sessionId: 'N/A', result: null, startTime: new Date(), endTime: new Date(), status: 'pending' });
+    setFutureSessions(upcoming);
+    
+    return processed;
+  };
+  
+  // Handle action (UP/DOWN)
+  const handleAction = (type: "UP" | "DOWN") => {
+    const betAmount = Number(amount.replace(/,/g, ""));
+    if (!betAmount || isNaN(betAmount)) {
+      toast({ variant: "destructive", title: "Lỗi", description: "Vui lòng nhập số tiền hợp lệ" });
+      return;
     }
+    if (betAmount < 100000) {
+      toast({ variant: "destructive", title: "Lỗi", description: "Số tiền tối thiểu là 100,000 VND" });
+      return;
+    }
+    if (user && betAmount > balance) {
+      toast({ variant: "destructive", title: "Lỗi", description: "Số dư không đủ" });
+      return;
+    }
+    setSelectedAction(type);
+    setIsConfirming(true);
+  };
+  
+  // Handle payout when session ends
+  const handlePayout = (session: Session) => {
+    const sessionOrders = userOrders.filter((order: Order) => order.sessionId === session.sessionId);
+    
+    if (sessionOrders.length === 0) return;
+    
+    sessionOrders.forEach((order: Order) => {
+      const orderAmount = order.amount;
+      const orderType = order.type;
+      const sessionResult = session.result;
       
+      if (orderType === sessionResult) {
+        const profit = orderAmount * 0.95;
+        setBalance((prev: number) => prev + orderAmount + profit);
+        
+        setTradeHistory((prev: TradeHistoryRecord[]) => {
+          return prev.map((item: TradeHistoryRecord) => {
+            if (item.session.toString() === session.sessionId.split('_')[1].replace(':', '')) {
+              return { ...item, status: 'win', profit };
+            }
+            return item;
+          });
+        });
+        
+        toast({
+          title: 'Thắng!',
+          description: `Bạn đã thắng ${formatCurrency(profit)} VND từ lệnh ${orderType}`,
+          variant: 'default'
+        });
+      } else {
+        setTradeHistory((prev: TradeHistoryRecord[]) => {
+          return prev.map((item: TradeHistoryRecord) => {
+            if (item.session.toString() === session.sessionId.split('_')[1].replace(':', '')) {
+              return { ...item, status: 'lose', profit: -orderAmount };
+            }
+            return item;
+          });
+        });
+        
+        toast({
+          title: 'Thua!',
+          description: `Bạn đã thua ${formatCurrency(orderAmount)} VND từ lệnh ${orderType}`,
+          variant: 'destructive'
+        });
+      }
+    });
+  };
+  
+  // Confirm trade order
+  const confirmTrade = async () => {
+    if (!selectedAction || !user || !token || !currentSession) return;
+    
+    const amountNum = Number(amount.replace(/,/g, ""));
+    
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sessionId: currentSession.sessionId,
+          amount: amountNum,
+          type: selectedAction,
+          userId: user.id
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to place order');
+      }
+        
       const newOrder = await response.json();
       
-      // Add to local orders
       setUserOrders(prev => [...prev, newOrder]);
       
-      // Add to pending trade history
       const tradeId = Date.now();
       const newHistoryItem: TradeHistoryRecord = {
         id: tradeId,
@@ -484,10 +519,8 @@ const confirmTrade = async () => {
       };
       setTradeHistory(prev => [...prev, newHistoryItem]);
       
-      // Trừ tiền locally (actual balance will be updated by API)
       setBalance(prev => prev - amountNum);
       
-      // Thông báo thành công
       toast({ title: 'Thành công', description: 'Đặt lệnh thành công' });
       setAmount('');
       
@@ -500,13 +533,18 @@ const confirmTrade = async () => {
       });
     } finally {
       setIsLoading(false);
-      // Đóng dialog xác nhận
       setIsConfirming(false);
       setSelectedAction(null);
     }
   };
 
-  if (loading) {
+  // Handle place order
+  const handlePlaceOrder = () => {
+    handleAction(orderType);
+  };
+
+  // Loading state
+  if (isLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -517,300 +555,288 @@ const confirmTrade = async () => {
 
   return (
     <>
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 px-2 md:px-4 pt-4 pb-8">
-          {/* Left Column - Order controls */}
-          <div className="lg:col-span-3 space-y-4">
-            <Card className="bg-white border border-gray-300 rounded-md shadow">
-              <CardHeader>
-                <div className="flex items-center space-x-2">
-                  <ChevronDown className="h-4 w-4 text-gray-700" />
-                  <CardTitle className="text-gray-900 text-base font-medium">Số dư</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="py-6 px-4">
-                <div className="flex items-center justify-between text-gray-900 text-lg font-semibold uppercase">
-                  <span>SỐ DƯ:</span>
-                  <span>{formatCurrency(balance)} VND</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-           
-            <Card className="bg-white border border-gray-300 rounded-md shadow">
-              <CardHeader>
-                <div className="flex items-center space-x-2">
-                  <ChevronDown className="h-4 w-4 text-gray-700" />
-                  <CardTitle className="text-gray-900 text-base font-medium">Đặt lệnh</CardTitle>
-                  <span className="bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded ml-auto">ID: {currentSession.sessionId}</span>
-                </div>
-              </CardHeader>
-              <CardContent className="py-4">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-6">
-                  {/* Đặt lệnh UP */}
-                  <div className="border border-green-500 rounded-lg p-4 bg-gray-800/50 hover:bg-gray-800 transition-colors">
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="flex items-center">
-                        <ArrowUp className="h-5 w-5 text-green-500 mr-1" />
-                        <span className="text-green-500 font-semibold">LÊN</span>
-                      </div>
-                      <Badge variant={orderType === "UP" ? "default" : "outline"} 
-                             className={orderType === "UP" ? "bg-green-600 hover:bg-green-700" : "text-green-500 border-green-500"} 
-                             onClick={() => setOrderType("UP")}>
-                        Đang chọn
-                      </Badge>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="w-full border-green-500 text-green-500 hover:bg-green-500 hover:text-white transition-colors"
-                      onClick={() => handleAction("UP")}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowUp className="mr-2 h-4 w-4" />}
-                      Đặt Lệnh Lên
-                    </Button>
-                  </div>
-
-                  {/* Đặt lệnh DOWN */}
-                  <div className="border border-red-500 rounded-lg p-4 bg-gray-800/50 hover:bg-gray-800 transition-colors">
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="flex items-center">
-                        <ArrowDown className="h-5 w-5 text-red-500 mr-1" />
-                        <span className="text-red-500 font-semibold">XUỐNG</span>
-                      </div>
-                      <Badge variant={orderType === "DOWN" ? "default" : "outline"} 
-                             className={orderType === "DOWN" ? "bg-red-600 hover:bg-red-700" : "text-red-500 border-red-500"} 
-                             onClick={() => setOrderType("DOWN")}>
-                        Đang chọn
-                      </Badge>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
-                      onClick={() => handleAction("DOWN")}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
-                      Đặt Lệnh Xuống
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Nhập Số tiền */}
-                <div className="mt-6 space-y-4">
-                  <div className="flex items-center">
-                    <h3 className="text-white text-lg">Số tiền đặt:</h3>
-                    <span className="ml-2 text-green-400 font-semibold">
-                      {formatCurrency(balance)} VND
-                    </span>
-                  </div>
-                  
-                  <div className="relative flex items-center">
-                    <DollarSign className="absolute left-3 text-gray-400 h-5 w-5" />
-                    <Input
-                      type="text"
-                      value={formatAmount(amount)}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="pl-10 pr-20 bg-gray-700 border-gray-600 text-white"
-                      placeholder="Nhập số tiền"
-                    />
-                    <div className="absolute right-3 flex items-center space-x-1">
-                      <Button size="icon" variant="ghost" onClick={() => addAmount(-100000)}>
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => addAmount(100000)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-4 gap-2">
-                    {QUICK_AMOUNTS.map((val) => (
-                      <Button
-                        key={val}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAmount(val.toString())}
-                        className="text-xs"
-                      >
-                        {formatCurrency(val)}
-                      </Button>
-                    ))}
-                  </div>
-                  
-                  <Button 
-                    className="w-full mt-2" 
-                    size="lg" 
-                    onClick={handlePlaceOrder}
-                    disabled={!amount || isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ) : null}
-                    Đặt lệnh {orderType === "UP" ? "LÊN" : "XUỐNG"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          {/* Middle Section - Chart and Session Info */}
-          <div className="lg:col-span-6 space-y-4">
-            {/* Chart Area */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader className="border-b border-gray-700 pb-2">
-                <CardTitle className="text-white flex justify-between items-center">
-                  <span>TradingView Chart</span>
-                  <Badge variant="outline" className="text-yellow-400 border-yellow-400">
-                    XAU/USD
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 h-[450px] lg:h-[500px]">
-                <TradingViewAdvancedChart />
-              </CardContent>
-            </Card>
-
-            {/* Current Session Info */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader className="border-b border-gray-700 pb-3">
-                <CardTitle className="text-white flex justify-between items-center flex-wrap gap-2">
-                  <span>Phiên hiện tại: {currentSession.sessionId}</span>
-                  <div className="flex items-center bg-gray-900 px-4 py-2 rounded-full">
-                    <Clock className="mr-2 h-5 w-5 text-blue-400" />
-                    <span className="text-blue-400 font-mono text-lg">{countdown}s</span>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="py-2">
-                <div className="flex flex-wrap justify-between gap-2 text-sm">
-                  <div className="text-gray-300">Bắt đầu: {new Date(currentSession.startTime).toLocaleTimeString()}</div>
-                  <div className="text-gray-300">
-                    Kết thúc: {currentSession.endTime ? new Date(currentSession.endTime).toLocaleTimeString() : 'Đang tính toán'}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 px-2 md:px-4 pt-4 pb-8">
+        {/* Left Column - Order controls */}
+        <div className="lg:col-span-3 space-y-4">
+          <Card className="bg-white border border-gray-300 rounded-md shadow">
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <ChevronDown className="h-4 w-4 text-gray-700" />
+                <CardTitle className="text-gray-900 text-base font-medium">Số dư</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="py-6 px-4">
+              <div className="flex items-center justify-between text-gray-900 text-lg font-semibold uppercase">
+                <span>SỐ DƯ:</span>
+                <span>{formatCurrency(balance)} VND</span>
+              </div>
+            </CardContent>
+          </Card>
           
-          {/* Right Section - Market Data and History */}
-          <div className="lg:col-span-3 space-y-4">
-            {/* Market Data */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader className="border-b border-gray-700 pb-3">
-                <CardTitle className="text-white flex justify-between items-center">
-                  <span>Thông tin thị trường</span>
-                  <Button
-                    variant="outline" 
-                    size="sm" 
-                    className="h-7 px-2"
-                    onClick={() => fetchSessions()}
-                  >
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Refresh
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="space-y-3">
-                  {marketData.map((market, index) => (
-                    <div key={index} className="flex justify-between items-center border-b border-gray-700 pb-2 last:border-0 last:pb-0">
-                      <div>
-                        <div className="text-white font-medium">{market.symbol}</div>
-                        <div className="text-gray-400 text-xs">Forex</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-white font-medium">${market.price.toFixed(2)}</div>
-                        <div className={market.change > 0 ? "text-green-500" : "text-red-500"}>
-                          {market.change > 0 ? "+" : ""}{market.change.toFixed(2)} ({market.changePercent.toFixed(2)}%)
-                        </div>
-                      </div>
+          <Card className="bg-white border border-gray-300 rounded-md shadow">
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <ChevronDown className="h-4 w-4 text-gray-700" />
+                <CardTitle className="text-gray-900 text-base font-medium">Đặt lệnh</CardTitle>
+                <span className="bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded ml-auto">ID: {currentSession.sessionId}</span>
+              </div>
+            </CardHeader>
+            <CardContent className="py-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+                <div className="border border-green-500 rounded-lg p-4 bg-gray-800/50 hover:bg-gray-800 transition-colors">
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center">
+                      <ArrowUp className="h-5 w-5 text-green-500 mr-1" />
+                      <span className="text-green-500 font-semibold">LÊN</span>
                     </div>
+                    <Badge variant={orderType === "UP" ? "default" : "outline"} 
+                          className={orderType === "UP" ? "bg-green-600 hover:bg-green-700" : "text-green-500 border-green-500"} 
+                          onClick={() => setOrderType("UP")}>
+                      Đang chọn
+                    </Badge>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-green-500 text-green-500 hover:bg-green-500 hover:text-white transition-colors"
+                    onClick={() => handleAction("UP")}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowUp className="mr-2 h-4 w-4" />}
+                    Đặt Lệnh Lên
+                  </Button>
+                </div>
+  
+                <div className="border border-red-500 rounded-lg p-4 bg-gray-800/50 hover:bg-gray-800 transition-colors">
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center">
+                      <ArrowDown className="h-5 w-5 text-red-500 mr-1" />
+                      <span className="text-red-500 font-semibold">XUỐNG</span>
+                    </div>
+                    <Badge variant={orderType === "DOWN" ? "default" : "outline"} 
+                          className={orderType === "DOWN" ? "bg-red-600 hover:bg-red-700" : "text-red-500 border-red-500"} 
+                          onClick={() => setOrderType("DOWN")}>
+                      Đang chọn
+                    </Badge>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+                    onClick={() => handleAction("DOWN")}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
+                    Đặt Lệnh Xuống
+                  </Button>
+                </div>
+              </div>
+  
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center">
+                  <h3 className="text-white text-lg">Số tiền đặt:</h3>
+                  <span className="ml-2 text-green-400 font-semibold">
+                    {formatCurrency(balance)} VND
+                  </span>
+                </div>
+                
+                <div className="relative flex items-center">
+                  <DollarSign className="absolute left-3 text-gray-400 h-5 w-5" />
+                  <Input
+                    type="text"
+                    value={formatAmount(amount)}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="pl-10 pr-20 bg-gray-700 border-gray-600 text-white"
+                    placeholder="Nhập số tiền"
+                  />
+                  <div className="absolute right-3 flex items-center space-x-1">
+                    <Button size="icon" variant="ghost" onClick={() => addAmount(-100000)}>
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => addAmount(100000)}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-4 gap-2">
+                  {QUICK_AMOUNTS.map((val) => (
+                    <Button
+                      key={val}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAmount(val.toString())}
+                      className="text-xs"
+                    >
+                      {formatCurrency(val)}
+                    </Button>
                   ))}
                 </div>
-
-                {/* Session info */}
-                <div className="mt-6">
-                  <h3 className="text-white font-medium mb-3">Thông tin phiên</h3>
-                  
-                  {/* Current session */}
-                  <div className="bg-gray-700 p-3 rounded-lg mb-3">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-gray-300">Phiên hiện tại:</span>
-                      <Badge variant="outline" className="text-blue-400 border-blue-400">
-                        {currentSession.sessionId}
-                      </Badge>
+                
+                <Button 
+                  className="w-full mt-2" 
+                  size="lg" 
+                  onClick={handlePlaceOrder}
+                  disabled={!amount || isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  ) : null}
+                  Đặt lệnh {orderType === "UP" ? "LÊN" : "XUỐNG"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+  
+        {/* Middle Section - Chart and Session Info */}
+        <div className="lg:col-span-6 space-y-4">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="border-b border-gray-700 pb-2">
+              <CardTitle className="text-white flex justify-between items-center">
+                <span>TradingView Chart</span>
+                <Badge variant="outline" className="text-yellow-400 border-yellow-400">
+                  XAU/USD
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 h-[450px] lg:h-[500px]">
+              <TradingViewAdvancedChart />
+            </CardContent>
+          </Card>
+  
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="border-b border-gray-700 pb-3">
+              <CardTitle className="text-white flex justify-between items-center flex-wrap gap-2">
+                <span>Phiên hiện tại: {currentSession.sessionId}</span>
+                <div className="flex items-center bg-gray-900 px-4 py-2 rounded-full">
+                  <Clock className="mr-2 h-5 w-5 text-blue-400" />
+                  <span className="text-blue-400 font-mono text-lg">{countdown}s</span>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="flex flex-wrap justify-between gap-2 text-sm">
+                <div className="text-gray-300">Bắt đầu: {new Date(currentSession.startTime).toLocaleTimeString()}</div>
+                <div className="text-gray-300">
+                  Kết thúc: {currentSession.endTime ? new Date(currentSession.endTime).toLocaleTimeString() : 'Đang tính toán'}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Right Section - Market Data and History */}
+        <div className="lg:col-span-3 space-y-4">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="border-b border-gray-700 pb-3">
+              <CardTitle className="text-white flex justify-between items-center">
+                <span>Thông tin thị trường</span>
+                <Button
+                  variant="outline" 
+                  size="sm" 
+                  className="h-7 px-2"
+                  onClick={() => fetchSessions()}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Refresh
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="space-y-3">
+                {marketData.map((market, index) => (
+                  <div key={index} className="flex justify-between items-center border-b border-gray-700 pb-2 last:border-0 last:pb-0">
+                    <div>
+                      <div className="text-white font-medium">{market.symbol}</div>
+                      <div className="text-gray-400 text-xs">Forex</div>
                     </div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-gray-300">Trạng thái:</span>
-                      <span className="text-white">
-                        {currentSession.status === 'pending' ? 'Đang diễn ra' : 'Đã kết thúc'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300">Kết quả:</span>
-                      <span className="text-white">
-                        {currentSession.result ? (
-                          currentSession.result === 'UP' ? (
-                            <Badge variant="default" className="bg-green-600 hover:bg-green-700">
-                              LÊN
-                            </Badge>
-                          ) : (
-                            <Badge variant="default" className="bg-red-600 hover:bg-red-700">
-                              XUỐNG
-                            </Badge>
-                          )
-                        ) : (
-                          'Chưa có'
-                        )}
-                      </span>
+                    <div className="text-right">
+                      <div className="text-white font-medium">${market.price.toFixed(2)}</div>
+                      <div className={market.change > 0 ? "text-green-500" : "text-red-500"}>
+                        {market.change > 0 ? "+" : ""}{market.change.toFixed(2)} ({market.changePercent.toFixed(2)}%)
+                      </div>
                     </div>
                   </div>
-
-                  {/* Future sessions */}
-                  <h4 className="text-white text-sm mb-2">Phiên sắp diễn ra:</h4>
-                  <div className="space-y-2">
-                    {futureSessions.slice(0, 3).map((session, index) => (
-                      <div key={index} className="bg-gray-700/50 p-2 rounded flex justify-between items-center">
-                        <span className="text-gray-300 text-xs">{session.sessionId}</span>
-                        <Badge variant="outline" className="text-yellow-400 border-yellow-400 text-xs">
-                          Sắp diễn ra
-                        </Badge>
-                      </div>
-                    ))}
-                    {futureSessions.length === 0 && (
-                      <div className="text-gray-400 text-sm text-center py-1">
-                        Không có phiên nào sắp diễn ra
-                      </div>
-                    )}
+                ))}
+              </div>
+  
+              <div className="mt-6">
+                <h3 className="text-white font-medium mb-3">Thông tin phiên</h3>
+                
+                <div className="bg-gray-700 p-3 rounded-lg mb-3">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-300">Phiên hiện tại:</span>
+                    <Badge variant="outline" className="text-blue-400 border-blue-400">
+                      {currentSession.sessionId}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-gray-300">Trạng thái:</span>
+                    <span className="text-white">
+                      {currentSession.status === 'pending' ? 'Đang diễn ra' : 'Đã kết thúc'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Kết quả:</span>
+                    <span className="text-white">
+                      {currentSession.result ? (
+                        currentSession.result === 'UP' ? (
+                          <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+                            LÊN
+                          </Badge>
+                        ) : (
+                          <Badge variant="default" className="bg-red-600 hover:bg-red-700">
+                            XUỐNG
+                          </Badge>
+                        )
+                      ) : (
+                        'Chưa có'
+                      )}
+                    </span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Trade History */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader className="border-b border-gray-700 pb-3">
-                <CardTitle className="text-white">
-                  Lịch sử giao dịch
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {tradeHistory.length > 0 ? (
-                  <div className="max-h-[350px] overflow-y-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-700 sticky top-0">
-                        <tr>
-                          <th className="text-left text-xs font-medium text-gray-300 px-3 py-2">Phiên</th>
-                          <th className="text-left text-xs font-medium text-gray-300 px-3 py-2">Lệnh</th>
-                          <th className="text-right text-xs font-medium text-gray-300 px-3 py-2">Số tiền</th>
-                          <th className="text-right text-xs font-medium text-gray-300 px-3 py-2">Lợi nhuận</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-700">
-                        {tradeHistory
-                          // Only display trades from past (completed) sessions
-                          .filter(trade => trade.status !== "pending")
-                          .map((trade) => (
+  
+                <h4 className="text-white text-sm mb-2">Phiên sắp diễn ra:</h4>
+                <div className="space-y-2">
+                  {futureSessions.slice(0, 3).map((session, index) => (
+                    <div key={index} className="bg-gray-700/50 p-2 rounded flex justify-between items-center">
+                      <span className="text-gray-300 text-xs">{session.sessionId}</span>
+                      <Badge variant="outline" className="text-yellow-400 border-yellow-400 text-xs">
+                        Sắp diễn ra
+                      </Badge>
+                    </div>
+                  ))}
+                  {futureSessions.length === 0 && (
+                    <div className="text-gray-400 text-sm text-center py-1">
+                      Không có phiên nào sắp diễn ra
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+  
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="border-b border-gray-700 pb-3">
+              <CardTitle className="text-white">
+                Lịch sử giao dịch
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {tradeHistory.length > 0 ? (
+                <div className="max-h-[350px] overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-700 sticky top-0">
+                      <tr>
+                        <th className="text-left text-xs font-medium text-gray-300 px-3 py-2">Phiên</th>
+                        <th className="text-left text-xs font-medium text-gray-300 px-3 py-2">Lệnh</th>
+                        <th className="text-right text-xs font-medium text-gray-300 px-3 py-2">Số tiền</th>
+                        <th className="text-right text-xs font-medium text-gray-300 px-3 py-2">Lợi nhuận</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700">
+                      {tradeHistory
+                        .filter(trade => trade.status !== "pending")
+                        .map((trade) => (
                           <tr key={trade.id} className="hover:bg-gray-700/50">
                             <td className="px-3 py-2 text-sm text-white">
                               {trade.session}
@@ -833,18 +859,39 @@ const confirmTrade = async () => {
                             </td>
                           </tr>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="py-6 text-center text-gray-400">
-                    Chưa có lịch sử giao dịch
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-gray-400">
+                  Chưa có lịch sử giao dịch
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
+      </div>
+  
+      <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận lệnh</DialogTitle>
+            <DialogDescription>
+              Bạn đang đặt lệnh {selectedAction} với số tiền {formatCurrency(Number(amount.replace(/,/g, "")))} VND cho phiên {currentSession.sessionId}.
+              Bạn có chắc chắn muốn tiếp tục?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirming(false)}>
+              Hủy
+            </Button>
+            <Button onClick={confirmTrade} disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Xác nhận
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
