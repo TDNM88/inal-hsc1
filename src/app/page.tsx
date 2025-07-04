@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import TradingViewTickerTape from "@/components/TradingViewTickerTape";
-import { Footer } from "react-day-picker";
+import Footer from "@/components/Footer";
 
 // Market ticker data
 const marketData = [
@@ -200,8 +200,8 @@ export default function Landing() {
             <iframe
               width="100%"
               height="200"
-              src="https://www.youtube.com/embed/ja3KjW4o7Zg"
-              title="Sở giao dịch chứng khoán London kỷ niệm 10 năm Wisdom Tree ở châu âu"
+              src="https://www.youtube.com/embed/xnCF64dVscM"
+              title="London HSC Trading Platform"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -308,9 +308,9 @@ export default function Landing() {
         </div>
       </div>
     </div>
-      </motion.div>
+  </motion.div>
 
-      <motion.div className="w-full overflow-x-hidden">
+    <div className="w-full overflow-x-hidden">
         <div className="mx-auto" style={{userSelect: 'none', boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '1028px'}}>
           <div className="relative pb-[calc(100%*0.7)]">
             <iframe 
@@ -324,6 +324,7 @@ export default function Landing() {
             </iframe>
           </div>
         </div>    
+    </div>
 
     {/* WisdomTree section */}
     <div style={{
@@ -499,5 +500,5 @@ export default function Landing() {
       {/* Footer */}
       <Footer />
     </div>
-  );
+    );
 }
