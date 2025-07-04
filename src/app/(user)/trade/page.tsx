@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import LiquidityTable from '@/components/LiquidityTable';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import TradingViewAdvancedChart from "@/components/TradingViewAdvancedChart";
 import TradingViewTickerTape from "@/components/TradingViewTickerTape";
 import RightColumn from './RightCollum';
 
@@ -85,7 +84,6 @@ export default function TradePage() {
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   
-  // Khởi tạo currentSession với giá trị mặc định
   // Hàm tạo ID phiên theo định dạng yymmddhhmm
   const generateSessionId = useCallback((time: Date): string => {
     const year = String(time.getFullYear()).slice(-2);
@@ -98,16 +96,13 @@ export default function TradePage() {
 
   // Hàm tạo thời gian bắt đầu và kết thúc của phiên
   const getSessionTimeRange = useCallback((time: Date) => {
-    // Đảm bảo time là một đối tượng Date hợp lệ
     if (!(time instanceof Date) || isNaN(time.getTime())) {
       time = new Date();
     }
     
-    // Thời gian bắt đầu là đầu phút hiện tại
     const startTime = new Date(time);
     startTime.setSeconds(0, 0);
     
-    // Thời gian kết thúc là đầu phút kế tiếp
     const endTime = new Date(startTime);
     endTime.setMinutes(endTime.getMinutes() + 1);
     
@@ -159,12 +154,10 @@ export default function TradePage() {
   const checkAndUpdateSession = useCallback((now: Date) => {
     const currentSessionId = generateSessionId(now);
     
-    // Nếu phiên hiện tại là N/A hoặc khác với ID phiên mới tính toán được
     if (currentSession.sessionId === 'N/A' || currentSession.sessionId !== currentSessionId) {
       console.log('Phát hiện phiên mới:', currentSessionId);
       const { startTime, endTime } = getSessionTimeRange(now);
       
-      // Tạo phiên mới
       const newSession = {
         sessionId: currentSessionId,
         result: null,
@@ -173,14 +166,12 @@ export default function TradePage() {
         endTime
       };
       
-      // Lưu phiên cũ vào lịch sử nếu có giá trị
       if (currentSession.sessionId !== 'N/A') {
         setPastSessions(prev => [currentSession, ...prev].slice(0, 20));
       }
       
       setCurrentSession(newSession);
       
-      // Làm mới danh sách phiên từ server
       fetchSessions().catch(error => {
         console.error('Lỗi khi tải danh sách phiên:', error);
         toast({
@@ -190,9 +181,9 @@ export default function TradePage() {
         });
       });
       
-      return true; // Đã cập nhật phiên mới
+      return true;
     }
-    return false; // Không cần cập nhật
+    return false;
   }, [currentSession, generateSessionId, getSessionTimeRange, toast]);
 
   // Hàm lấy danh sách phiên từ server
@@ -214,7 +205,6 @@ export default function TradePage() {
       const now = new Date();
       const currentSessionId = generateSessionId(now);
       
-      // Tìm phiên hiện tại và các phiên trước đó
       const running: Session[] = [];
       const past: Session[] = [];
       const future: Session[] = [];
@@ -244,7 +234,6 @@ export default function TradePage() {
         }
       }
       
-      // Nếu không có phiên nào đang chạy, tạo một phiên mới
       if (running.length === 0) {
         const { startTime, endTime } = getSessionTimeRange(now);
         running.push({
@@ -256,7 +245,6 @@ export default function TradePage() {
         });
       }
       
-      // Cập nhật state
       setCurrentSession(running[0]);
       setPastSessions(past);
       setFutureSessions(future);
@@ -278,18 +266,15 @@ export default function TradePage() {
   const handleSessionUpdate = useCallback((data: any) => {
     const { sessionId, result, status } = data;
     
-    // Cập nhật phiên hiện tại nếu trùng ID
     if (currentSession.sessionId === sessionId) {
       const updatedSession = { ...currentSession, result, status };
       setCurrentSession(updatedSession);
       
-      // Xử lý thanh toán nếu có kết quả
       if (status === 'completed' && result) {
         handlePayout(updatedSession);
       }
     }
     
-    // Cập nhật trong danh sách phiên tương lai
     if (futureSessions.some(session => session.sessionId === sessionId)) {
       setFutureSessions(prev => 
         prev.map(session => 
@@ -300,7 +285,6 @@ export default function TradePage() {
       );
     }
     
-    // Cập nhật trong danh sách phiên đã qua
     if (pastSessions.some(session => session.sessionId === sessionId)) {
       setPastSessions(prev => 
         prev.map(session => 
@@ -355,7 +339,7 @@ export default function TradePage() {
           sessionId: currentSession.sessionId,
           direction: selectedAction,
           amount: Number(amount),
-          asset: 'XAU/USD' // Hoặc thay đổi tùy theo tài sản giao dịch
+          asset: 'XAU/USD'
         })
       });
       
@@ -365,10 +349,8 @@ export default function TradePage() {
       
       const result = await response.json();
       
-      // Cập nhật số dư
       setBalance(prev => prev - Number(amount));
       
-      // Thêm vào lịch sử giao dịch
       setTradeHistory(prev => [
         {
           id: Date.now(),
@@ -386,7 +368,6 @@ export default function TradePage() {
         description: 'Đặt lệnh thành công',
       });
       
-      // Đặt lại form
       setAmount('');
       setSelectedAction(null);
       
@@ -407,15 +388,12 @@ export default function TradePage() {
   const handlePayout = useCallback((session: Session) => {
     if (!session.result) return;
     
-    // Tìm tất cả đơn đặt lệnh của phiên này
     const sessionOrders = userOrders.filter(order => order.sessionId === session.sessionId);
     
-    // Tính toán kết quả cho từng đơn
     sessionOrders.forEach(order => {
       const isWin = order.type === session.result;
       const profit = isWin ? order.amount * 1.8 : 0;
       
-      // Cập nhật lịch sử giao dịch
       setTradeHistory(prev => [
         ...prev,
         {
@@ -428,7 +406,6 @@ export default function TradePage() {
         }
       ]);
       
-      // Cập nhật số dư nếu thắng
       if (isWin) {
         setBalance(prev => prev + profit);
       }
@@ -457,19 +434,16 @@ export default function TradePage() {
             const now = new Date(data.timestamp);
             setCurrentTime(now);
             
-            // Cập nhật countdown
             const countdownValue = 59 - now.getSeconds();
             setCountdown(countdownValue);
             setTimeLeft(countdownValue);
             
-            // Kiểm tra và cập nhật phiên nếu cần
             checkAndUpdateSession(now);
           }
         };
         
         ws.onclose = () => {
           console.log('WebSocket disconnected');
-          // Tự động kết nối lại sau 5 giây
           setTimeout(connectWebSocket, 5000);
         };
         
@@ -502,7 +476,6 @@ export default function TradePage() {
       try {
         setIsLoading(true);
         
-        // Tải thông tin người dùng
         const userResponse = await fetch(`${API_BASE_URL}/api/users/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -512,7 +485,6 @@ export default function TradePage() {
           setBalance(userData.balance || 0);
         }
         
-        // Tải lịch sử giao dịch
         const historyResponse = await fetch(`${API_BASE_URL}/api/trades/history`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -522,7 +494,6 @@ export default function TradePage() {
           setTradeHistory(historyData);
         }
         
-        // Tải danh sách phiên
         await fetchSessions();
         
       } catch (error) {
@@ -564,7 +535,7 @@ export default function TradePage() {
     );
   }
 
-  // Sửa lỗi MouseEvent không phải generic
+  // Xác nhận lệnh
   function confirmTrade(event: React.MouseEvent<HTMLButtonElement>) {
     confirmPlaceOrder();
   }
@@ -635,7 +606,7 @@ export default function TradePage() {
                 </DialogHeader>
                 <DialogDescription className="text-gray-300 text-center">
                   XÁC NHẬN
-                </DialogDescription>
+                  </DialogDescription>
                 <DialogFooter className="flex gap-2">
                   <Button
                     type="button"
