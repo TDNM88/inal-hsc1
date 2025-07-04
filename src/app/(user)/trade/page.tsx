@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
 import { useToast } from "@/components/ui/use-toast";
-import { AlertCircle, ArrowDown, ArrowUp, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, ChevronDown, Loader2, Minus, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import LiquidityTable from '@/components/LiquidityTable';
@@ -119,6 +119,26 @@ export default function TradePage() {
     return new Intl.NumberFormat('vi-VN').format(value);
   };
 
+  // Hàm định dạng số tiền đầu vào
+  const formatAmount = (value: string) => {
+    const num = parseFloat(value.replace(/,/g, ""));
+    if (isNaN(num)) return "";
+    return new Intl.NumberFormat('vi-VN').format(num);
+  };
+
+  // Hàm xử lý tăng/giảm số tiền
+  const addAmount = (value: number) => {
+    const current = parseFloat(amount.replace(/,/g, "")) || 0;
+    const newAmount = Math.max(0, current + value);
+    setAmount(newAmount.toString());
+  };
+
+  // Hàm xử lý hành động chọn hướng giao dịch
+  const handleAction = (direction: "UP" | "DOWN") => {
+    setSelectedAction(direction);
+    handlePlaceOrder();
+  };
+
   // Khởi tạo state
   const [currentSession, setCurrentSession] = useState<Session>(() => {
     const now = new Date();
@@ -213,13 +233,13 @@ export default function TradePage() {
           past.push({
             ...session,
             startTime: sessionTime,
-            endTime: sessionEndTime
+            endTime: new Date(sessionTime.getTime() + 60 * 1000)
           });
         } else {
           future.push({
             ...session,
             startTime: sessionTime,
-            endTime: sessionEndTime
+            endTime: new Date(sessionTime.getTime() + 60 * 1000)
           });
         }
       }
@@ -544,154 +564,227 @@ export default function TradePage() {
     );
   }
 
+  // Sửa lỗi MouseEvent không phải generic
+  function confirmTrade(event: React.MouseEvent<HTMLButtonElement>) {
+    confirmPlaceOrder();
+  }
+
   return (
-    <div className="container mx-auto p-4">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Cột trái - Số dư, Đặt lệnh, Thanh khoản */}
-        <div className="space-y-4">
-          {/* Số dư */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Số dư</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(balance)} VND
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Đặt lệnh */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Đặt lệnh giao dịch</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="flex space-x-2 mb-4">
-                    <Button 
-                      variant={selectedAction === 'UP' ? 'default' : 'outline'} 
-                      className="flex-1 bg-green-100 hover:bg-green-200 text-green-800 border-green-300"
-                      onClick={() => setSelectedAction('UP')}
-                    >
-                      <ArrowUp className="mr-2 h-4 w-4" /> TĂNG
-                    </Button>
-                    <Button 
-                      variant={selectedAction === 'DOWN' ? 'default' : 'outline'} 
-                      className="flex-1 bg-red-100 hover:bg-red-200 text-red-800 border-red-300"
-                      onClick={() => setSelectedAction('DOWN')}
-                    >
-                      <ArrowDown className="mr-2 h-4 w-4" /> GIẢM
-                    </Button>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Số tiền (VND)</label>
-                    <Input 
-                      type="number" 
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="Nhập số tiền"
-                      className="w-full"
-                    />
-                    <div className="grid grid-cols-4 gap-2 mt-2">
-                      {QUICK_AMOUNTS.map((value) => (
-                        <Button 
-                          key={value} 
-                          variant="outline" 
-                          size="sm"
-                          className="text-xs"
-                          onClick={() => setAmount(String(value))}
-                        >
-                          {new Intl.NumberFormat('vi-VN').format(value)}
-                        </Button>
-                      ))}
+    <div className="min-h-screen bg-gray-900">
+      <div className="p-4 md:p-8">
+        {isLoading || loading ? (
+          <div className="flex items-center justify-center min-h-[calc(100vh-80px)] bg-gray-900">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <span className="ml-2 text-white">Đang tải...</span>
+          </div>
+        ) : (
+          <>
+            <Dialog
+              open={tradeResult.status === "win" || tradeResult.status === "lose"}
+              onOpenChange={(open) => !open && setTradeResult(prev => ({ ...prev, status: "idle" }))}
+            >
+              <DialogContent className="sm:max-w-[425px] bg-gray-800 border-green-500">
+                <DialogHeader>
+                  <DialogTitle className={`text-2xl text-center ${tradeResult.status === "win" ? "text-green-500" : "text-red-500"}`}>
+                    {tradeResult.status === "win" ? "Chúc mừng bạn đã thắng!" : "Rất tiếc, bạn đã thua"}
+                  </DialogTitle>
+                  <DialogDescription className="text-center text-white">
+                    {tradeResult.profit && tradeResult.profit > 0 ? "+" : ""}
+                    {tradeResult.profit ? formatCurrency(tradeResult.profit) : 0} VND
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="text-gray-400">Lệnh:</div>
+                    <div className="text-white">
+                      {tradeResult.direction === "UP" ? "LÊN" : tradeResult.direction === "DOWN" ? "XUỐNG" : "-"}
+                    </div>
+                    <div className="text-gray-400">Giá vào:</div>
+                    <div className="text-white">{tradeResult.entryPrice?.toFixed(2) || "-"}</div>
+                    <div className="text-gray-400">Giá đóng:</div>
+                    <div className="text-white">{tradeResult.exitPrice?.toFixed(2) || "-"}</div>
+                    <div className="text-gray-400">Số tiền:</div>
+                    <div className="text-white">
+                      {tradeResult.amount ? formatCurrency(tradeResult.amount) : 0} VND
+                    </div>
+                    <div className="text-gray-400">Lợi nhuận:</div>
+                    <div className={`font-bold ${(tradeResult.profit || 0) >= 0 ? "text-green-500" : "text-red-600"}`}>
+                      {tradeResult.profit && tradeResult.profit > 0 ? "+" : ""}
+                      {tradeResult.profit ? formatCurrency(tradeResult.profit) : 0} VND
                     </div>
                   </div>
-                  
-                  <Button 
-                    className="w-full"
-                    disabled={!selectedAction || !amount || isSubmitting}
-                    onClick={handlePlaceOrder}
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={() => setTradeResult({ status: "idle" })}
                   >
-                    {isSubmitting ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      'XÁC NHẬN ĐẶT LỆNH'
-                    )}
+                    Đóng
                   </Button>
-                </div>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
+              <DialogContent className="sm:max-w-[425px] bg-gray-800">
+                <DialogHeader className="flex items-center justify-center">
+                  <DialogTitle className="text-white text-center">
+                    Phiên hiện tại <span className="text-red-500">{currentSession.sessionId}</span>
+                  </DialogTitle>
+                </DialogHeader>
+                <DialogDescription className="text-gray-300 text-center">
+                  XÁC NHẬN
+                </DialogDescription>
+                <DialogFooter className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                    onClick={() => setIsConfirming(false)}
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    type="button"
+                    className={`flex-1 ${selectedAction === "UP" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
+                    onClick={confirmTrade}
+                  >
+                    Xác nhận
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Cột bên phải hiển thị đầu tiên trên mobile để đưa bảng giá lên đầu */}
+              <div className="lg:col-span-8 lg:order-2 order-1">
+                <RightColumn
+                  isLoading={isLoading}
+                  tradeHistory={tradeHistory}
+                  formatCurrency={formatCurrency}
+                />
               </div>
-            </CardContent>
-          </Card>
-          
-          {/* Thanh khoản */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Thanh khoản</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="mt-4">
-                  <LiquidityTable />
-                </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Cột phải - Bảng giá, Lịch sử lệnh, Thông tin thị trường */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardContent>
-              <div className="h-[500px]">
-                <TradingViewAdvancedChart />
+
+              {/* Cột bên trái hiển thị thứ hai trên mobile */}
+              <div className="lg:col-span-4 space-y-6 lg:order-1 order-2">
+                <Card className="bg-white border border-gray-300 rounded-md shadow">
+                  <CardHeader>
+                    <div className="flex items-center space-x-2">
+                      <ChevronDown className="h-4 w-4 text-gray-700" />
+                      <CardTitle className="text-gray-900 text-base font-medium">Số dư</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="py-6 px-4">
+                    <div className="flex items-center justify-between text-gray-900 text-lg font-semibold uppercase">
+                      <span>SỐ DƯ:</span>
+                      <span>{formatCurrency(balance || 0)} VND</span>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white border border-gray-300 rounded-md shadow">
+                  <CardHeader>
+                    <div className="flex items-center space-x-2">
+                      <ChevronDown className="h-4 w-4 text-gray-700" />
+                      <CardTitle className="text-gray-900 text-base font-medium">Đặt lệnh</CardTitle>
+                      <span className="bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded ml-auto">
+                        Phiên: {currentSession.sessionId}
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <label htmlFor="amount" className="text-sm text-gray-400">
+                          Số tiền (VND)
+                        </label>
+                        <span className="text-xs text-gray-400">Tối thiểu: {formatCurrency(100000)}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="icon" onClick={() => addAmount(-100000)}>
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          id="amount"
+                          type="text"
+                          value={formatAmount(amount)}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/,/g, "");
+                            if (/^\d*$/.test(raw)) setAmount(raw);
+                          }}
+                          placeholder="Nhập số tiền"
+                        />
+                        <Button variant="outline" size="icon" onClick={() => addAmount(100000)}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-2">
+                        {QUICK_AMOUNTS.map((value) => (
+                          <Button
+                            key={value}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-sm font-semibold bg-white hover:bg-gray-100"
+                            onClick={() => addAmount(value)}
+                          >
+                            {value >= 1000000 ? `+${value / 1000000}M` : `+${value / 1000}K`}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1 mb-4 text-sm text-gray-900">
+                      <div className="flex justify-between">
+                        <span>Ngày:</span>
+                        <span>{new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Giờ:</span>
+                        <span>{new Date().toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Phiên hiện tại:</span>
+                        <span>{currentSession.sessionId}</span>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <div className="border border-red-600 rounded bg-gray-100 text-center py-3">
+                        <div className="text-sm text-gray-900">Hãy đặt lệnh:</div>
+                        <div className="text-xl font-bold text-red-600">{String(timeLeft).padStart(2, '0')}s</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <Button
+                        type="button"
+                        className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-bold flex items-center justify-center"
+                        onClick={() => handleAction("UP")}
+                        disabled={isLoading || !amount}
+                      >
+                        LÊN <ArrowUp className="h-5 w-5 ml-2" />
+                      </Button>
+                      <Button
+                        type="button"
+                        className="w-full h-14 bg-red-600 hover:bg-red-700 text-lg font-bold flex items-center justify-center"
+                        onClick={() => handleAction("DOWN")}
+                        disabled={isLoading || !amount}
+                      >
+                        XUỐNG <ArrowDown className="h-5 w-5 ml-2" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white border-gray-300 rounded-md shadow">
+                  <CardHeader>
+                    <CardTitle className="text-gray-900">Cập nhật</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <LiquidityTable />
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center">
-                  <span className="text-sm text-gray-500 mr-2">Kết thúc sau:</span>
-                  <span className="font-mono text-lg font-bold">
-                    {String(Math.floor(timeLeft / 10))}{timeLeft % 10}s
-                  </span>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-          
-          <RightColumn 
-            isLoading={loading}
-            tradeHistory={tradeHistory}
-            formatCurrency={formatCurrency}
-          />
-        </div>
-        
-        {/* Dialog xác nhận đặt lệnh */}
-        <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Xác nhận đặt lệnh</DialogTitle>
-              <DialogDescription>
-                Bạn có chắc chắn muốn đặt lệnh {selectedAction === 'UP' ? 'TĂNG' : 'GIẢM'} với số tiền {new Intl.NumberFormat('vi-VN').format(Number(amount))} VND?
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsConfirming(false)}>Hủy</Button>
-              <Button 
-                onClick={confirmPlaceOrder}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  'Xác nhận'
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
