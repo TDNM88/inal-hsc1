@@ -31,7 +31,8 @@ export default function LoginPage() {
         toast({ title: 'Đăng nhập thành công', description: 'Đang chuyển hướng...' });
         
         // Sử dụng window.location để đảm bảo chuyển hướng mạnh
-        const redirectUrl = data.user.role === 'admin' ? '/admin' : '/trade';
+        // Nếu là admin, chuyển đến trang quản trị ẩn /dashboard-hsc thay vì /admin
+        const redirectUrl = data.user.role === 'admin' ? '/dashboard-hsc' : '/trade';
         setTimeout(() => {
           window.location.href = redirectUrl;
         }, 1000);
