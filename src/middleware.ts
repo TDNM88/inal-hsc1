@@ -1,6 +1,27 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyToken } from './lib/auth';
+import { jwtVerify } from 'jose';
+
+// Hàm xác thực token JWT tương thích với Edge Runtime
+async function verifyJWTToken(token: string) {
+  try {
+    // Sử dụng jose thay vì jsonwebtoken để tương thích với Edge
+    const JWT_SECRET = new TextEncoder().encode(
+      process.env.JWT_SECRET || 'inalhsc-secret-key'
+    );
+    
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    
+    return {
+      id: payload.id as string,
+      username: payload.username as string,
+      role: payload.role as string
+    };
+  } catch (error) {
+    console.error('JWT verification error:', error);
+    return null;
+  }
+}
 
 export async function middleware(request: NextRequest) {
   // Chặn truy cập trực tiếp đến trang admin
@@ -22,7 +43,7 @@ export async function middleware(request: NextRequest) {
 
     try {
       // Xác thực token và kiểm tra quyền admin
-      const user = await verifyToken(token);
+      const user = await verifyJWTToken(token);
       
       if (!user || user.role !== 'admin') {
         // Không phải admin, điều hướng về trang chủ
