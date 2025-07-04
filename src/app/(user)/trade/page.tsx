@@ -171,7 +171,17 @@ export default function TradePage() {
   }, [token, user, loading, router, toast]);
 
   useEffect(() => {
+    // Nếu đang sử dụng dữ liệu mẫu, không kết nối WebSocket
+    if (USE_MOCK_DATA) {
+      console.log('Đang chạy chế độ mock data, không kết nối WebSocket');
+      // Thiết lập dữ liệu mẫu thay thế
+      setUserOrders([]);
+      return;
+    }
+
+    // Chỉ kết nối khi có user và token
     if (!user || !token) return;
+    
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 3;
 
@@ -198,58 +208,70 @@ export default function TradePage() {
           wsUrl = `ws://${window.location.hostname}:${window.location.port || '3000'}/ws`;
         }
 
-        console.log(`Đang kết nối WebSocket đến: ${wsUrl}`);
-        
-        // Xử lý lỗi khi tạo WebSocket
-        const ws = new WebSocket(wsUrl);
-        ws.onopen = () => {
-          console.log('WebSocket connected');
-          reconnectAttempts = 0;
-          if (token) {
-            ws.send(JSON.stringify({ type: 'auth', token }));
-          }
-        };
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'sessionUpdate') {
-              handleSessionUpdate(data);
-            } else if (data.type === 'balanceUpdate') {
-              setBalance(data.balance);
-            }
-          } catch (error) {
-            console.error('WebSocket message error:', error);
-          }
-        };
-        ws.onclose = () => {
-          console.log('WebSocket disconnected, trying to reconnect...');
-          reconnectAttempts++;
-          const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts));
-          setTimeout(connectWebSocket, delay);
-        };
-        ws.onerror = (error) => {
-          // Cải thiện xử lý lỗi WebSocket
-          console.error('WebSocket error:', error);
+        // Thêm vào try-catch để tránh lỗi khi websocket không thể kết nối
+        try {
+          console.log(`Đang kết nối WebSocket đến: ${wsUrl}`);
           
-          // Nếu đang ở chế độ development với mock data, không hiển thị lỗi
-          if (USE_MOCK_DATA) {
-            console.log('Đang ở chế độ mock data, bỏ qua lỗi WebSocket');
-          } else {
-            // Chỉ hiện toast lỗi nếu không phải mock mode
-            toast({ 
-              variant: 'destructive', 
-              title: 'Lỗi kết nối', 
-              description: 'Không thể kết nối đến máy chủ giao dịch. Đang sử dụng dữ liệu cục bộ.' 
-            });
+          // Xử lý lỗi khi tạo WebSocket
+          const ws = new WebSocket(wsUrl);
+          ws.onopen = () => {
+            console.log('WebSocket connected');
+            reconnectAttempts = 0;
+            if (token) {
+              ws.send(JSON.stringify({ type: 'auth', token }));
+            }
+          };
+          ws.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'sessionUpdate') {
+                handleSessionUpdate(data);
+              } else if (data.type === 'balanceUpdate') {
+                setBalance(data.balance);
+              }
+            } catch (error) {
+              // Chỉ log ra lỗi khi không ở chế độ mock data
+              if (!USE_MOCK_DATA) {
+                console.error('WebSocket message error:', error);
+              }
+            }
+          };
+          ws.onclose = () => {
+            // Chỉ thử kết nối lại khi không ở chế độ mock data
+            if (!USE_MOCK_DATA) {
+              console.log('WebSocket disconnected, trying to reconnect...');
+              reconnectAttempts++;
+              const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts));
+              setTimeout(connectWebSocket, delay);
+            }
+          };
+          ws.onerror = (error) => {
+            // Không hiển thị lỗi trong chế độ mock data
+            if (!USE_MOCK_DATA) {
+              console.warn('WebSocket connection failed, falling back to mock data');
+              toast({ 
+                variant: 'default', 
+                title: 'Đang sử dụng dữ liệu offline', 
+                description: 'Ứng dụng sẽ tự động kết nối lại khi có mạng.' 
+              });
+            }
+          };
+          wsRef.current = ws;
+        } catch (connectionError) {
+          // Xử lý lỗi khi không thể tạo WebSocket
+          if (!USE_MOCK_DATA) {
+            console.warn('Không thể tạo WebSocket connection:', connectionError);
           }
-          ws.close();
-        };
-        wsRef.current = ws;
+        }
       } catch (error) {
-        console.error('WebSocket connection error:', error);
-        setTimeout(connectWebSocket, 3000);
+        // Xử lý lỗi chung
+        if (!USE_MOCK_DATA) {
+          console.error('WebSocket setup error:', error);
+          setTimeout(connectWebSocket, 3000);
+        }
       }
     };
+    
     connectWebSocket();
     return () => {
       if (wsRef.current) {

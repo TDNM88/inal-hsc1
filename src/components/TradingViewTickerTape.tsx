@@ -58,39 +58,52 @@ const TradingViewTickerTape = memo(function TradingViewTickerTape() {
   useEffect(() => {
     if (!container.current) return;
     setIsLoaded(false);
-
-    // Clear any existing content
-    while (container.current.firstChild) {
-      container.current.removeChild(container.current.firstChild);
+    
+    // Đảm bảo container có thẻ widget bên trong trước khi thêm script
+    const widgetContainer = container.current.querySelector('.tradingview-widget-container__widget');
+    if (!widgetContainer) {
+      const div = document.createElement('div');
+      div.className = 'tradingview-widget-container__widget';
+      container.current.appendChild(div);
     }
+    
+    // Đợi một chút để đảm bảo DOM đã render
+    const timer = setTimeout(() => {
+      if (!container.current) return;
+      
+      // Clear any existing scripts
+      const existingScripts = container.current.querySelectorAll('script');
+      existingScripts.forEach(script => script.remove());
+      
+      // Create and configure the script
+      const script = document.createElement("script");
+      script.src = "https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js";
+      script.async = true;
+      script.type = "text/javascript";
+      script.innerHTML = JSON.stringify({
+        symbols: allSymbols.slice(0, symbolCount),
+        showSymbolLogo: true,
+        colorTheme: "light",
+        isTransparent: false,
+        displayMode: "adaptive",
+        locale: "vi_VN",
+      });
+      
+      // Show loading state is complete when script loads
+      script.onload = () => {
+        setIsLoaded(true);
+      };
 
-    // Create and configure the script
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      symbols: allSymbols.slice(0, symbolCount), // Limit symbols based on screen size
-      showSymbolLogo: true,
-      colorTheme: "light",
-      isTransparent: false,
-      displayMode: "adaptive",
-      locale: "vi_VN",
-    });
-
-    // Show loading state is complete when script loads
-    script.onload = () => {
-      setIsLoaded(true);
-    };
-
-    // Append the script to the container
-    container.current.appendChild(script);
-
+      // Append the script to the container
+      container.current.appendChild(script);
+    }, 300); // Delay để DOM sẵn sàng trước khi render widget
+    
     return () => {
+      clearTimeout(timer);
       // Cleanup
       if (container.current) {
-        while (container.current.firstChild) {
-          container.current.removeChild(container.current.firstChild);
-        }
+        const scripts = container.current.querySelectorAll('script');
+        scripts.forEach(script => script.remove());
       }
     };
   }, [symbolCount]); // Re-render when symbolCount changes
