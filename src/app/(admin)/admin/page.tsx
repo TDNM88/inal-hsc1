@@ -788,7 +788,13 @@ function TradingSessionsPage({ token }: any) {
 
   // Hàm tạo ID phiên từ thời gian
   const generateSessionId = (time: Date) => {
-    return `${time.getFullYear()}-${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')}_${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+    // Format: yymmddhhmm (năm-tháng-ngày-giờ-phút)
+    const year = String(time.getFullYear()).slice(-2); // lấy 2 chữ số cuối của năm
+    const month = String(time.getMonth() + 1).padStart(2, '0');
+    const day = String(time.getDate()).padStart(2, '0');
+    const hours = String(time.getHours()).padStart(2, '0');
+    const minutes = String(time.getMinutes()).padStart(2, '0');
+    return `${year}${month}${day}${hours}${minutes}`;
   };
 
   // Hàm khởi tạo 30 phiên tương lai với kết quả ngẫu nhiên

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import UserMenu from '@/components/user-menu';
 import useSWR from 'swr';
 import { Upload } from 'lucide-react';
 
@@ -76,12 +75,8 @@ export default function DepositPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <header className="flex justify-end p-4 border-b border-gray-700">
-        <UserMenu user={user} logout={logout} />
-      </header>
-      <main className="p-6">
-        <Card className="bg-gray-800 border-gray-700 max-w-2xl mx-auto">
+    <div className="text-white">
+      <Card className="bg-gray-800 border-gray-700 max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="text-white">Nạp tiền</CardTitle>
           </CardHeader>
@@ -135,7 +130,6 @@ export default function DepositPage() {
             </Button>
           </CardContent>
         </Card>
-      </main>
     </div>
   );
 }

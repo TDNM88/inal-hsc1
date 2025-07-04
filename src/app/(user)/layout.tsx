@@ -3,8 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { Button } from '@/components/ui/button';
-import { User, LogOut } from 'lucide-react';
+import Header from '@/components/Header';
 
 export default function TradeLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -35,21 +34,7 @@ export default function TradeLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-700 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center text-black">
-          <User className="h-6 w-6 mr-2" />
-          <div>{user?.name || user?.email || 'User'}</div>
-        </div>
-        <Button
-          variant="outline"
-          className="text-black border-gray-600 hover:bg-gray-700"
-          onClick={handleLogout}
-        >
-          <LogOut className="h-5 w-5 mr-2" />
-          Đăng xuất
-        </Button>
-      </div>
+      <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </main>

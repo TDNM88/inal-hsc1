@@ -59,6 +59,16 @@ export default function TradePage() {
   const { toast } = useToast();
   const wsRef = useRef<WebSocket | null>(null);
 
+  // Kiểm tra xác thực ngay lập tức trước khi render nội dung
+  useEffect(() => {
+    // Nếu đã tải xong thông tin người dùng và không có thông tin đăng nhập
+    if (!loading && !user) {
+      // Chuyển hướng về trang đăng nhập
+      router.replace('/auth/login');
+      toast({ variant: 'destructive', title: 'Vui lòng đăng nhập để sử dụng tính năng này' });
+    }
+  }, [loading, user, router, toast]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [amount, setAmount] = useState('');
@@ -109,7 +119,36 @@ export default function TradePage() {
   };
 
   const generateSessionId = (time: Date): string => {
-    return `${time.getFullYear()}-${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')}-${String(time.getHours()).padStart(2, '0')}-${String(time.getMinutes()).padStart(2, '0')}`;
+    // Format: yymmddhhmm (năm-tháng-ngày-giờ-phút)
+    const year = String(time.getFullYear()).slice(-2); // lấy 2 chữ số cuối của năm
+    const month = String(time.getMonth() + 1).padStart(2, '0');
+    const day = String(time.getDate()).padStart(2, '0');
+    const hours = String(time.getHours()).padStart(2, '0');
+    const minutes = String(time.getMinutes()).padStart(2, '0');
+    return `${year}${month}${day}${hours}${minutes}`;
+  };
+  
+  // Hàm tạo thời gian bắt đầu và kết thúc của phiên theo phút hiện tại
+  const getSessionTimeRange = (time: Date) => {
+    const startTime = new Date(
+      time.getFullYear(), 
+      time.getMonth(), 
+      time.getDate(), 
+      time.getHours(), 
+      time.getMinutes(), 
+      0
+    );
+    
+    const endTime = new Date(
+      time.getFullYear(), 
+      time.getMonth(), 
+      time.getDate(), 
+      time.getHours(), 
+      time.getMinutes(), 
+      59
+    );
+    
+    return { startTime, endTime };
   };
 
   const handleLogout = () => {
@@ -142,23 +181,26 @@ export default function TradePage() {
         return;
       }
       try {
+        // Đảm bảo API_BASE_URL được định nghĩa
         if (!API_BASE_URL) {
           console.error('API_BASE_URL không được định nghĩa, không thể kết nối WebSocket');
           return;
         }
 
+        // Tạo WebSocket URL an toàn hơn
         let wsUrl = '';
-       /antlr4ts-browser@0.5.0-alpha.4
         if (API_BASE_URL.startsWith('https://')) {
           wsUrl = `wss://${API_BASE_URL.replace('https://', '')}/ws`;
         } else if (API_BASE_URL.startsWith('http://')) {
           wsUrl = `ws://${API_BASE_URL.replace('http://', '')}/ws`;
         } else {
+          // Fallback cho môi trường phát triển
           wsUrl = `ws://${window.location.hostname}:${window.location.port || '3000'}/ws`;
         }
 
         console.log(`Đang kết nối WebSocket đến: ${wsUrl}`);
         
+        // Xử lý lỗi khi tạo WebSocket
         const ws = new WebSocket(wsUrl);
         ws.onopen = () => {
           console.log('WebSocket connected');
@@ -186,10 +228,14 @@ export default function TradePage() {
           setTimeout(connectWebSocket, delay);
         };
         ws.onerror = (error) => {
+          // Cải thiện xử lý lỗi WebSocket
           console.error('WebSocket error:', error);
+          
+          // Nếu đang ở chế độ development với mock data, không hiển thị lỗi
           if (USE_MOCK_DATA) {
             console.log('Đang ở chế độ mock data, bỏ qua lỗi WebSocket');
           } else {
+            // Chỉ hiện toast lỗi nếu không phải mock mode
             toast({ 
               variant: 'destructive', 
               title: 'Lỗi kết nối', 
@@ -217,14 +263,42 @@ export default function TradePage() {
       const now = new Date();
       setCurrentTime(now);
       
+      // Tính toán countdown theo cách của trang admin (59 - giây hiện tại)
       const countdownValue = 59 - now.getSeconds();
       setCountdown(countdownValue);
       setTimeLeft(countdownValue);
       
-      if (currentSession && currentSession.startTime !== 'N/A') {
-        if (countdownValue === 0 && currentSession.status === 'pending' && !currentSession.result) {
-          fetchSessionResult(currentSession.sessionId);
+      // Kiểm tra xem có phải phiên mới không bằng cách so sánh ID phiên
+      const currentSessionId = generateSessionId(now);
+      
+      // Nếu phiên hiện tại là N/A hoặc khác với ID phiên mới tính toán được, thì cần cập nhật
+      if (currentSession.sessionId === 'N/A' || currentSession.sessionId !== currentSessionId) {
+        console.log('Phát hiện phiên mới:', currentSessionId);
+        const { startTime, endTime } = getSessionTimeRange(now);
+        
+        // Tạo phiên mới và cập nhật state
+        const newSession = {
+          sessionId: currentSessionId,
+          result: null,
+          status: 'pending',
+          startTime: startTime,
+          endTime: endTime
+        };
+        
+        // Lưu phiên cũ vào lịch sử nếu có giá trị
+        if (currentSession.sessionId !== 'N/A') {
+          setPastSessions(prev => [currentSession, ...prev].slice(0, 20));
         }
+        
+        setCurrentSession(newSession);
+        
+        // Tự động làm mới danh sách phiên từ server
+        fetchSessions();
+      }
+      
+      // Xử lý kết quả phiên khi countdown = 0
+      if (countdownValue === 0 && currentSession.status === 'pending' && !currentSession.result) {
+        fetchSessionResult(currentSession.sessionId);
       }
     }, 1000);
     return () => clearInterval(timer);
@@ -274,7 +348,9 @@ export default function TradePage() {
           });
           setTradeHistory(prev =>
             prev.map(item => {
-              if (item.session.toString() === sessionId.split('-')[3] + sessionId.split('-')[4]) {
+              // Với định dạng mới yymmddhhmm, session đã là một số giờ-phút
+              // Lấy 4 số cuối của sessionId (giờ và phút)
+              if (item.session.toString() === sessionId.slice(-4)) {
                 const isWin = item.direction === result;
                 return {
                   ...item,
@@ -285,8 +361,9 @@ export default function TradePage() {
               return item;
             })
           );
+          // Lấy 4 số cuối của sessionId (giờ và phút) để lọc giao dịch liên quan
           const relevantTrades = tradeHistory.filter(t =>
-            t.session.toString() === sessionId.split('-')[3] + sessionId.split('-')[4]
+            t.session.toString() === sessionId.slice(-4)
           );
           relevantTrades.forEach(trade => {
             const isWin = trade.direction === result;
@@ -493,12 +570,14 @@ export default function TradePage() {
         const tradeId = Date.now();
         const newHistoryItem: TradeHistoryRecord = {
           id: tradeId,
-          session: parseInt(currentSession.sessionId.split('-')[3] + currentSession.sessionId.split('-')[4]),
+          // Với định dạng mới yymmddhhmm, lấy 4 số cuối là giờ và phút
+          session: parseInt(currentSession.sessionId.slice(-4) || '0'),
           direction: selectedAction,
           amount: amountNum,
           status: "pending",
           profit: 0
         };
+        // Giới hạn lịch sử giao dịch chỉ hiển thị 30 lệnh gần nhất
         setTradeHistory(prev => [newHistoryItem, ...prev].slice(0, 30));
         setBalance(prev => prev - amountNum);
         toast({ title: 'Thành công', description: 'Đặt lệnh thành công' });
@@ -528,7 +607,8 @@ export default function TradePage() {
       const tradeId = Date.now();
       const newHistoryItem: TradeHistoryRecord = {
         id: tradeId,
-        session: parseInt(currentSession.sessionId.split('-')[3] + currentSession.sessionId.split('-')[4]),
+        // Với định dạng mới yymmddhhmm, lấy 4 số cuối là giờ và phút
+        session: parseInt(currentSession.sessionId.slice(-4)),
         direction: selectedAction,
         amount: amountNum,
         status: "pending",

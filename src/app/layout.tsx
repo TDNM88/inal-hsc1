@@ -15,7 +15,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="vi">
       <body className="flex flex-col min-h-screen">
         <main className="flex-1">{children}</main>
+        <meta name="viewport"
+          content="width=device-width, height=device-height,  initial-scale=1.0, user-scalable=no;user-scalable=0;" />
+        <title>London SSI</title> 
       </body>
     </html>
-  )
-}
+      )
+    }
+
+

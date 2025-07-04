@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu"
-import { User as UserIcon, LogOut, Wallet } from "lucide-react"
+import { User as UserIcon, LogOut, Wallet, CreditCard, ArrowUpRight, ArrowDownLeft, Clock } from "lucide-react"
 
 export default function Header() {
   const router = useRouter()
@@ -43,6 +43,31 @@ export default function Header() {
             </div>
           )}
           
+          {!loading && user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Wallet className="h-4 w-4" />
+                  <span>Ví</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => router.push("/deposit")}>
+                  <ArrowDownLeft className="mr-2 h-4 w-4" />
+                  <span>Nạp tiền</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/withdraw")}>
+                  <ArrowUpRight className="mr-2 h-4 w-4" />
+                  <span>Rút tiền</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/orders")}>
+                  <Clock className="mr-2 h-4 w-4" />
+                  <span>Lịch sử giao dịch</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          
           <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="default" className="gap-2">
@@ -56,7 +81,7 @@ export default function Header() {
                   <span>Tài khoản</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push("/trade")}>
-                  <Wallet className="mr-2 h-4 w-4" />
+                  <CreditCard className="mr-2 h-4 w-4" />
                   <span>Giao dịch</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
