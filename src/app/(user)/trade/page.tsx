@@ -14,7 +14,7 @@ import RightColumn from './RightCollum';
 
 // Constants
 const QUICK_AMOUNTS = [100000, 1000000, 5000000, 10000000, 30000000, 50000000, 100000000, 200000000];
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = 'https://inal-hsc-api.vercel.app';
 
 // Define types
 interface Session {
@@ -47,41 +47,8 @@ export default function TradePage() {
   const { user, token, loading, logout } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const wsRef = useRef<WebSocket | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Kiểm tra xác thực ngay lập tức trước khi render nội dung
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/auth/login');
-      toast({ variant: 'destructive', title: 'Vui lòng đăng nhập để sử dụng tính năng này' });
-    }
-  }, [loading, user, router, toast]);
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [selectedAction, setSelectedAction] = useState<"UP" | "DOWN" | null>(null);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [marketData, setMarketData] = useState([
-    { symbol: "XAU/USD", price: 2337.16, change: 12.5, changePercent: 0.54 },
-    { symbol: "OIL", price: 85.20, change: -0.45, changePercent: -0.53 },
-  ]);
-  const [tradeResult, setTradeResult] = useState<{
-    status: "idle" | "win" | "lose" | "processing";
-    direction?: "UP" | "DOWN";
-    entryPrice?: number;
-    exitPrice?: number;
-    amount?: number;
-    profit?: number;
-  }>({ status: "idle" });
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [countdown, setCountdown] = useState(59);
-  const [balance, setBalance] = useState<number>(0);
-  const [userOrders, setUserOrders] = useState<Order[]>([]);
-  const [tradeHistory, setTradeHistory] = useState<TradeHistoryRecord[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  
   // Hàm tạo ID phiên theo định dạng yymmddhhmm
   const generateSessionId = useCallback((time: Date): string => {
     const year = String(time.getFullYear()).slice(-2);
@@ -107,46 +74,57 @@ export default function TradePage() {
     return { startTime, endTime };
   }, []);
 
+  // Kiểm tra xác thực ngay lập tức trước khi render nội dung
+  useEffect(() => {
+    console.log('Token:', token); // Debug token
+    if (!loading && !user) {
+      router.replace('/auth/login');
+      toast({ variant: 'destructive', title: 'Vui lòng đăng nhập để sử dụng tính năng này' });
+    }
+  }, [loading, user, router, toast]);
+
+  // State declarations
+  const [isLoading, setIsLoading] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [currentAmount, setCurrentAmount] = useState<string>('');
+  const [selectedAction, setSelectedAction] = useState<"UP" | "DOWN" | null>(null);
+  const [timeLeft, setTimeLeft] = useState(59);
+  const [marketData, setMarketData] = useState([
+    { symbol: "XAU/USD", price: 2337.16, change: 12.5, changePercent: 0.54 },
+    { symbol: "OIL", price: 85.20, change: -0.45, changePercent: -0.53 },
+  ]);
+  const [tradeResult, setTradeResult] = useState<{
+    status: "idle" | "win" | "lose" | "processing";
+    direction?: "UP" | "DOWN";
+    entryPrice?: number;
+    exitPrice?: number;
+    amount?: number;
+    profit?: number;
+  }>({ status: "idle" });
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [balance, setBalance] = useState<number>(0);
+  const [userOrders, setUserOrders] = useState<Order[]>([]);
+  const [tradeHistory, setTradeHistory] = useState<TradeHistoryRecord[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // Khởi tạo currentSession
+  const now = new Date();
+  const { startTime, endTime } = getSessionTimeRange(now);
+  const [currentSession, setCurrentSession] = useState<Session>({
+    sessionId: generateSessionId(now),
+    result: null,
+    status: 'pending',
+    startTime,
+    endTime
+  });
+  const [pastSessions, setPastSessions] = useState<Session[]>([]);
+  const [futureSessions, setFutureSessions] = useState<Session[]>([]);
+
   // Hàm định dạng tiền tệ
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('vi-VN').format(value);
   };
-
-  // Hàm định dạng số tiền đầu vào
-  const formatAmount = (value: string) => {
-    const num = parseFloat(value.replace(/,/g, ""));
-    if (isNaN(num)) return "";
-    return new Intl.NumberFormat('vi-VN').format(num);
-  };
-
-  // Hàm xử lý tăng/giảm số tiền
-  const addAmount = (value: number) => {
-    const current = parseFloat(amount.replace(/,/g, "")) || 0;
-    const newAmount = Math.max(0, current + value);
-    setAmount(newAmount.toString());
-  };
-
-  // Hàm xử lý hành động chọn hướng giao dịch
-  const handleAction = (direction: "UP" | "DOWN") => {
-    setSelectedAction(direction);
-    handlePlaceOrder();
-  };
-
-  // Khởi tạo state
-  const [currentSession, setCurrentSession] = useState<Session>(() => {
-    const now = new Date();
-    const { startTime, endTime } = getSessionTimeRange(now);
-    return {
-      sessionId: generateSessionId(now),
-      result: null,
-      status: 'pending',
-      startTime,
-      endTime
-    };
-  });
-  
-  const [pastSessions, setPastSessions] = useState<Session[]>([]);
-  const [futureSessions, setFutureSessions] = useState<Session[]>([]);
 
   // Hàm kiểm tra và cập nhật phiên hiện tại
   const checkAndUpdateSession = useCallback((now: Date) => {
@@ -170,33 +148,44 @@ export default function TradePage() {
       
       setCurrentSession(newSession);
       
-      fetchSessions().catch(error => {
-        console.error('Lỗi khi tải danh sách phiên:', error);
-        toast({
-          title: 'Lỗi',
-          description: 'Không thể tải thông tin phiên. Vui lòng làm mới trang.',
-          variant: 'destructive'
+      // Đồng bộ timeLeft với thời gian hệ thống
+      setTimeLeft(59 - now.getSeconds());
+      
+      // Chỉ gọi fetchSessions nếu token hợp lệ
+      if (token) {
+        fetchSessions().catch(error => {
+          console.error('Lỗi khi tải danh sách phiên:', error.message);
+          toast({
+            title: 'Lỗi',
+            description: `Không thể tải thông tin phiên: ${error.message}. Dùng phiên cục bộ.`,
+            variant: 'destructive'
+          });
         });
-      });
+      }
       
       return true;
     }
     return false;
-  }, [currentSession, generateSessionId, getSessionTimeRange, toast]);
+  }, [currentSession, generateSessionId, getSessionTimeRange, token, toast]);
 
   // Hàm lấy danh sách phiên từ server
   const fetchSessions = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      console.warn('Không có token, bỏ qua fetchSessions');
+      return;
+    }
     
     try {
+      console.log('Fetching sessions from:', `${API_BASE_URL}/api/sessions`);
       const response = await fetch(`${API_BASE_URL}/api/sessions`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
       if (!response.ok) {
-        throw new Error('Không thể tải dữ liệu phiên');
+        throw new Error(`HTTP ${response.status}: Không thể tải dữ liệu phiên`);
       }
       
       const data = await response.json();
@@ -249,14 +238,14 @@ export default function TradePage() {
       
       return { running: running[0], past, future };
       
-    } catch (error) {
-      console.error('Lỗi khi tải danh sách phiên:', error);
+    } catch (error: any) {
+      console.error('Lỗi khi tải danh sách phiên:', error.message);
       toast({
         title: 'Lỗi',
-        description: 'Không thể tải thông tin phiên. Vui lòng thử lại sau.',
+        description: `Không thể tải thông tin phiên: ${error.message}. Dùng phiên cục bộ.`,
         variant: 'destructive'
       });
-      throw error;
+      return null; // Trả về null thay vì throw để không làm crash loadInitialData
     }
   }, [token, generateSessionId, getSessionTimeRange, toast]);
 
@@ -296,7 +285,7 @@ export default function TradePage() {
 
   // Hàm xử lý đặt lệnh
   const handlePlaceOrder = () => {
-    if (!selectedAction || !amount) {
+    if (!selectedAction || !currentAmount) {
       toast({
         title: 'Lỗi',
         description: 'Vui lòng chọn hướng và nhập số tiền',
@@ -305,7 +294,7 @@ export default function TradePage() {
       return;
     }
     
-    if (Number(amount) > balance) {
+    if (Number(currentAmount) > balance) {
       toast({
         title: 'Lỗi',
         description: 'Số dư không đủ để đặt lệnh',
@@ -316,17 +305,23 @@ export default function TradePage() {
     
     setIsConfirming(true);
   };
-  
+
   // Xác nhận đặt lệnh
   const confirmPlaceOrder = async () => {
-    if (!selectedAction || !amount || !token) {
+    if (!selectedAction || !currentAmount || !token) {
       setIsConfirming(false);
+      toast({
+        title: 'Lỗi',
+        description: 'Thiếu thông tin để đặt lệnh hoặc token không hợp lệ',
+        variant: 'destructive'
+      });
       return;
     }
     
     try {
       setIsSubmitting(true);
       
+      console.log('Placing order to:', `${API_BASE_URL}/api/trades/place-order`);
       const response = await fetch(`${API_BASE_URL}/api/trades/place-order`, {
         method: 'POST',
         headers: {
@@ -336,25 +331,25 @@ export default function TradePage() {
         body: JSON.stringify({
           sessionId: currentSession.sessionId,
           direction: selectedAction,
-          amount: Number(amount),
+          amount: Number(currentAmount),
           asset: 'XAU/USD'
         })
       });
       
       if (!response.ok) {
-        throw new Error('Đặt lệnh thất bại');
+        throw new Error(`HTTP ${response.status}: Đặt lệnh thất bại`);
       }
       
       const result = await response.json();
       
-      setBalance(prev => prev - Number(amount));
+      setBalance(prev => prev - Number(currentAmount));
       
       setTradeHistory(prev => [
         {
           id: Date.now(),
           session: parseInt(currentSession.sessionId.slice(-4)),
           direction: selectedAction,
-          amount: Number(amount),
+          amount: Number(currentAmount),
           status: 'pending',
           profit: 0
         },
@@ -366,14 +361,14 @@ export default function TradePage() {
         description: 'Đặt lệnh thành công',
       });
       
-      setAmount('');
+      setCurrentAmount('');
       setSelectedAction(null);
       
-    } catch (error) {
-      console.error('Lỗi khi đặt lệnh:', error);
+    } catch (error: any) {
+      console.error('Lỗi khi đặt lệnh:', error.message);
       toast({
         title: 'Lỗi',
-        description: 'Đã xảy ra lỗi khi đặt lệnh. Vui lòng thử lại.',
+        description: `Đã xảy ra lỗi khi đặt lệnh: ${error.message}. Vui lòng thử lại.`,
         variant: 'destructive'
       });
     } finally {
@@ -410,97 +405,94 @@ export default function TradePage() {
     });
   }, [userOrders]);
 
-  // Kết nối WebSocket để nhận cập nhật thời gian thực
+  // Đếm ngược client-side
   useEffect(() => {
-    if (!token) return;
-    
-    const connectWebSocket = () => {
-      try {
-        const ws = new WebSocket(`wss://${API_BASE_URL?.replace(/^https?:\/\//, '')}/ws`);
-        
-        ws.onopen = () => {
-          console.log('WebSocket connected');
-          ws.send(JSON.stringify({ type: 'auth', token }));
-        };
-        
-        ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          
-          if (data.type === 'sessionUpdate') {
-            handleSessionUpdate(data.payload);
-          } else if (data.type === 'timeUpdate') {
-            const now = new Date(data.timestamp);
-            setCurrentTime(now);
-            
-            const countdownValue = 59 - now.getSeconds();
-            setCountdown(countdownValue);
-            setTimeLeft(countdownValue);
-            
-            checkAndUpdateSession(now);
-          }
-        };
-        
-        ws.onclose = () => {
-          console.log('WebSocket disconnected');
-          setTimeout(connectWebSocket, 5000);
-        };
-        
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          ws.close();
-        };
-        
-        wsRef.current = ws;
-        
-      } catch (error) {
-        console.error('Lỗi kết nối WebSocket:', error);
+    const startClientSideCountdown = () => {
+      if (!intervalRef.current) {
+        console.log('Starting client-side countdown');
+        intervalRef.current = setInterval(() => {
+          const now = new Date();
+          setTimeLeft((prev) => {
+            const currentSeconds = now.getSeconds();
+            const newTimeLeft = prev > 0 ? 59 - currentSeconds : 59;
+            console.log('Client-side updating timeLeft:', newTimeLeft);
+            if (newTimeLeft === 59) {
+              checkAndUpdateSession(now);
+            }
+            return newTimeLeft;
+          });
+        }, 1000);
       }
     };
-    
-    connectWebSocket();
+
+    const stopClientSideCountdown = () => {
+      if (intervalRef.current) {
+        console.log('Stopping client-side countdown');
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+
+    startClientSideCountdown();
     
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      stopClientSideCountdown();
     };
-  }, [token, checkAndUpdateSession, handleSessionUpdate]);
+  }, [checkAndUpdateSession]);
 
   // Tải dữ liệu ban đầu khi component mount
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      console.warn('No token available, skipping loadInitialData');
+      return;
+    }
     
     const loadInitialData = async () => {
       try {
         setIsLoading(true);
         
+        // Fetch user data
+        console.log('Fetching user from:', `${API_BASE_URL}/api/users/me`);
         const userResponse = await fetch(`${API_BASE_URL}/api/users/me`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
-        
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          setBalance(userData.balance || 0);
+        if (!userResponse.ok) {
+          throw new Error(`HTTP ${userResponse.status}: Không thể tải thông tin người dùng`);
         }
+        const userData = await userResponse.json();
+        setBalance(userData.balance || 0);
         
+        // Fetch trade history
+        console.log('Fetching trade history from:', `${API_BASE_URL}/api/trades/history`);
         const historyResponse = await fetch(`${API_BASE_URL}/api/trades/history`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
+        if (!historyResponse.ok) {
+          throw new Error(`HTTP ${historyResponse.status}: Không thể tải lịch sử giao dịch`);
+        }
+        const historyData = await historyResponse.json();
+        setTradeHistory(historyData);
         
-        if (historyResponse.ok) {
-          const historyData = await historyResponse.json();
-          setTradeHistory(historyData);
+        // Fetch sessions
+        const sessionsData = await fetchSessions();
+        if (!sessionsData) {
+          console.warn('Failed to fetch sessions, using local session');
         }
         
-        await fetchSessions();
-        
-      } catch (error) {
-        console.error('Lỗi khi tải dữ liệu ban đầu:', error);
+      } catch (error: any) {
+        console.error('Lỗi khi tải dữ liệu ban đầu:', error.message);
         toast({
           title: 'Lỗi',
-          description: 'Không thể tải dữ liệu. Vui lòng làm mới trang.',
+          description: `Không thể tải dữ liệu: ${error.message}. Vui lòng làm mới trang.`,
           variant: 'destructive'
         });
+        setError(error.message);
       } finally {
         setIsLoading(false);
       }
@@ -508,6 +500,12 @@ export default function TradePage() {
     
     loadInitialData();
   }, [token, fetchSessions, toast]);
+
+  // Hàm xử lý hành động chọn hướng giao dịch
+  const handleAction = (direction: "UP" | "DOWN") => {
+    setSelectedAction(direction);
+    handlePlaceOrder();
+  };
 
   // Hiển thị loading
   if (isLoading) {
@@ -534,9 +532,9 @@ export default function TradePage() {
   }
 
   // Xác nhận lệnh
-  function confirmTrade(event: React.MouseEvent<HTMLButtonElement>) {
+  const confirmTrade = (event: React.MouseEvent<HTMLButtonElement>) => {
     confirmPlaceOrder();
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -670,20 +668,20 @@ export default function TradePage() {
                         <span className="text-xs text-gray-400">Tối thiểu: {formatCurrency(100000)}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => addAmount(-100000)}>
+                        <Button variant="outline" size="icon" onClick={() => setCurrentAmount((prev) => (Math.max(0, Number(prev) - 100000)).toString())}>
                           <Minus className="h-4 w-4" />
                         </Button>
                         <Input
                           id="amount"
                           type="text"
-                          value={formatAmount(amount)}
+                          value={formatCurrency(Number(currentAmount) || 0)}
                           onChange={(e) => {
                             const raw = e.target.value.replace(/,/g, "");
-                            if (/^\d*$/.test(raw)) setAmount(raw);
+                            if (/^\d*$/.test(raw)) setCurrentAmount(raw);
                           }}
                           placeholder="Nhập số tiền"
                         />
-                        <Button variant="outline" size="icon" onClick={() => addAmount(100000)}>
+                        <Button variant="outline" size="icon" onClick={() => setCurrentAmount((prev) => (Number(prev) + 100000).toString())}>
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
@@ -695,7 +693,7 @@ export default function TradePage() {
                             variant="outline"
                             size="sm"
                             className="text-sm font-semibold bg-white hover:bg-gray-100"
-                            onClick={() => addAmount(value)}
+                            onClick={() => setCurrentAmount(value.toString())}
                           >
                             {value >= 1000000 ? `+${value / 1000000}M` : `+${value / 1000}K`}
                           </Button>
@@ -727,7 +725,7 @@ export default function TradePage() {
                         type="button"
                         className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-bold flex items-center justify-center"
                         onClick={() => handleAction("UP")}
-                        disabled={isLoading || !amount}
+                        disabled={isLoading || !currentAmount}
                       >
                         LÊN <ArrowUp className="h-5 w-5 ml-2" />
                       </Button>
@@ -735,7 +733,7 @@ export default function TradePage() {
                         type="button"
                         className="w-full h-14 bg-red-600 hover:bg-red-700 text-lg font-bold flex items-center justify-center"
                         onClick={() => handleAction("DOWN")}
-                        disabled={isLoading || !amount}
+                        disabled={isLoading || !currentAmount}
                       >
                         XUỐNG <ArrowDown className="h-5 w-5 ml-2" />
                       </Button>
