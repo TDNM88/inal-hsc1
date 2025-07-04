@@ -30,12 +30,13 @@ export default function LoginPage() {
         login(data.token, data.user);
         toast({ title: 'Đăng nhập thành công', description: 'Đang chuyển hướng...' });
         
-        // Sử dụng window.location để đảm bảo chuyển hướng mạnh
+        // Sử dụng router.push để điều hướng trong Next.js
         // Nếu là admin, chuyển đến trang quản trị ẩn /dashboard-hsc thay vì /admin
-        const redirectUrl = data.user.role === 'admin' ? '/dashboard-hsc' : '/trade';
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, 1000);
+        if (data.user.role === 'admin') {
+          router.push('/dashboard-hsc');
+        } else {
+          router.push('/trade');
+        }
       } else {
         toast({ variant: 'destructive', title: 'Lỗi', description: data.message });
       }

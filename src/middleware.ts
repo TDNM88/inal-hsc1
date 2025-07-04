@@ -30,40 +30,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // Cho phép truy cập qua đường dẫn ẩn (dashboard-hsc)
+  // Rewrite /dashboard-hsc đến /admin mà không kiểm tra token ở middleware
+  // Xác thực sẽ được xử lý tại trang admin client-side
   if (request.nextUrl.pathname.startsWith('/dashboard-hsc')) {
-    // Kiểm tra token xác thực từ cookie hoặc header
-    const token = request.cookies.get('token')?.value 
-      || request.headers.get('authorization')?.split(' ')[1];
+    // Làm rewrite URL trực tiếp đến route admin thực tế
+    const newPath = request.nextUrl.pathname.replace('/dashboard-hsc', '/admin');
     
-    if (!token) {
-      // Không có token, điều hướng về trang login
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-
-    try {
-      // Xác thực token và kiểm tra quyền admin
-      const user = await verifyJWTToken(token);
-      
-      if (!user || user.role !== 'admin') {
-        // Không phải admin, điều hướng về trang chủ
-        return NextResponse.redirect(new URL('/', request.url));
-      }
-
-      // Là admin, cho phép truy cập và rewrite URL nội bộ đến route admin thực tế
-      const newPath = request.nextUrl.pathname.replace('/dashboard-hsc', '/admin');
-      
-      // Tạo URL mới với đường dẫn đã thay đổi
-      const url = new URL(newPath, request.url);
-      // Sao chép tất cả params từ URL gốc
-      url.search = request.nextUrl.search;
-      
-      return NextResponse.rewrite(url);
-    } catch (error) {
-      console.error('Admin access error:', error);
-      // Token không hợp lệ, điều hướng về login
-      return NextResponse.redirect(new URL('/login?error=auth', request.url));
-    }
+    // Tạo URL mới với đường dẫn đã thay đổi
+    const url = new URL(newPath, request.url);
+    // Sao chép tất cả params từ URL gốc
+    url.search = request.nextUrl.search;
+    
+    return NextResponse.rewrite(url);
   }
 
   // Các URL khác được truy cập bình thường
