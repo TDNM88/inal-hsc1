@@ -24,7 +24,7 @@ import RightColumn from './RightCollum';
 // Constants
 const QUICK_AMOUNTS = [100000, 1000000, 5000000, 10000000, 30000000, 50000000, 100000000, 200000000];
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = true; // Sẽ được chuyển sang false khi API hoàn thiện
 
 // Define types
 interface Session {
@@ -87,15 +87,18 @@ export default function TradePage() {
     profit?: number;
   }>({ status: "idle" });
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [currentAmount, setCurrentAmount] = useState<string>('');
   const [countdown, setCountdown] = useState(59);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSession, setCurrentSession] = useState<Session>({
-    sessionId: 'N/A',
+    sessionId: 'N/A', // Sẽ được định dạng theo chuẩn yymmddhhmm
     result: null,
+    status: 'pending',
     startTime: new Date(),
-    status: 'pending'
   });
   const [pastSessions, setPastSessions] = useState<Session[]>([]);
+  // Phiên giao dịch trong tương lai, sử dụng cùng định dạng ID với trang admin (yymmddhhmm)
   const [futureSessions, setFutureSessions] = useState<Session[]>([]);
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [balance, setBalance] = useState<number>(user?.balance || 0);
@@ -370,9 +373,9 @@ export default function TradePage() {
           });
           setTradeHistory(prev =>
             prev.map(item => {
-              // Với định dạng mới yymmddhhmm, session đã là một số giờ-phút
-              // Lấy 4 số cuối của sessionId (giờ và phút)
-              if (item.session.toString() === sessionId.slice(-4)) {
+              // Sử dụng toàn bộ sessionId để đảm bảo tính nhất quán với trang admin
+              // Đồng bộ với format yymmddhhmm
+              if (item.session.toString() === sessionId) {
                 const isWin = item.direction === result;
                 return {
                   ...item,
@@ -383,9 +386,10 @@ export default function TradePage() {
               return item;
             })
           );
-          // Lấy 4 số cuối của sessionId (giờ và phút) để lọc giao dịch liên quan
+          // Sử dụng toàn bộ sessionId để lọc giao dịch liên quan
+          // Đồng bộ với format yymmddhhmm từ trang admin
           const relevantTrades = tradeHistory.filter(t =>
-            t.session.toString() === sessionId.slice(-4)
+            t.session.toString() === sessionId
           );
           relevantTrades.forEach(trade => {
             const isWin = trade.direction === result;
