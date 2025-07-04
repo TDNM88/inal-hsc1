@@ -26,10 +26,16 @@ export async function POST(req: NextRequest) {
 
     // Xử lý form data
     const formData = await req.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get('document') as File;
+    const type = formData.get('type') as string;
 
     if (!file) {
       return NextResponse.json({ message: 'Không tìm thấy file' }, { status: 400 });
+    }
+
+    // Xác thực loại tài liệu
+    if (!['front', 'back'].includes(type)) {
+      return NextResponse.json({ message: 'Loại tài liệu không hợp lệ' }, { status: 400 });
     }
 
     // Kiểm tra loại file
@@ -43,14 +49,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Kích thước file không được vượt quá 5MB' }, { status: 400 });
     }
 
-    // Upload file lên Vercel Blob
-    const fileUrl = await uploadFile(file);
+    try {
+      // Upload file lên Vercel Blob
+      const fileUrl = await uploadFile(file);
 
-    // Trả về đường dẫn file
-    return NextResponse.json({
-      message: 'Upload thành công',
-      url: fileUrl
-    }, { status: 200 });
+      // TODO: Lưu thông tin file vào database nếu cần
+      // Ví dụ: lưu fileUrl và type vào user profile
+      
+      // Trả về đường dẫn file
+      return NextResponse.json({
+        success: true,
+        message: `Đã tải lên ${type === 'front' ? 'mặt trước' : 'mặt sau'} thành công`,
+        url: fileUrl,
+        type: type
+      }, { status: 200 });
+    } catch (error) {
+      console.error('Upload error:', error);
+      throw error;
+    }
 
   } catch (error) {
     console.error('Error uploading file:', error);

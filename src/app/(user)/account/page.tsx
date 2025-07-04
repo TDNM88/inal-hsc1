@@ -24,6 +24,70 @@ export default function AccountPage() {
     accountNumber: ''
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [frontIdFile, setFrontIdFile] = useState<File | null>(null);
+  const [backIdFile, setBackIdFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (type === 'front') {
+        setFrontIdFile(file);
+      } else {
+        setBackIdFile(file);
+      }
+    }
+  };
+
+  // Handle file upload
+  const handleUpload = async (type: 'front' | 'back') => {
+    const file = type === 'front' ? frontIdFile : backIdFile;
+    if (!file) return;
+
+    setIsUploading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('type', type);
+      
+      const res = await fetch('/api/upload', {  // Sửa lại đường dẫn API
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        // Cập nhật UI sau khi upload thành công
+        if (type === 'front') {
+          setFrontIdFile(null); // Reset file input
+          const input = document.getElementById('frontId') as HTMLInputElement;
+          if (input) input.value = '';
+        } else {
+          setBackIdFile(null); // Reset file input
+          const input = document.getElementById('backId') as HTMLInputElement;
+          if (input) input.value = '';
+        }
+        
+        toast({ 
+          title: 'Thành công', 
+          description: data.message || `Đã tải lên ${type === 'front' ? 'mặt trước' : 'mặt sau'} thành công` 
+        });
+      } else {
+        throw new Error(data.message || 'Có lỗi xảy ra khi tải lên');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể kết nối đến máy chủ' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
   
   // Xử lý query parameter tab từ URL
   useEffect(() => {
@@ -341,17 +405,65 @@ export default function AccountPage() {
               <div>
                 <label className="block text-gray-400 mb-1">CMND/CCCD mặt trước</label>
                 <div className="border-2 border-dashed border-gray-700 p-6 rounded-lg text-center">
-                  <p className="text-gray-500">Kéo và thả hoặc click để tải file lên</p>
-                  <input type="file" className="hidden" />
-                  <Button className="mt-2 bg-blue-600 hover:bg-blue-700">Tải lên</Button>
+                  <p className="text-gray-500">
+                    {frontIdFile ? frontIdFile.name : 'Kéo và thả hoặc click để tải file lên'}
+                  </p>
+                  <input 
+                    type="file" 
+                    id="frontId"
+                    className="hidden" 
+                    accept="image/*,.pdf"
+                    onChange={(e) => handleFileChange(e, 'front')}
+                  />
+                  <Button 
+                    type="button"
+                    className="mt-2 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => document.getElementById('frontId')?.click()}
+                  >
+                    Chọn file
+                  </Button>
+                  {frontIdFile && (
+                    <Button 
+                      type="button"
+                      className="mt-2 ml-2 bg-green-600 hover:bg-green-700"
+                      onClick={() => handleUpload('front')}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? 'Đang tải lên...' : 'Tải lên'}
+                    </Button>
+                  )}
                 </div>
               </div>
               <div>
                 <label className="block text-gray-400 mb-1">CMND/CCCD mặt sau</label>
                 <div className="border-2 border-dashed border-gray-700 p-6 rounded-lg text-center">
-                  <p className="text-gray-500">Kéo và thả hoặc click để tải file lên</p>
-                  <input type="file" className="hidden" />
-                  <Button className="mt-2 bg-blue-600 hover:bg-blue-700">Tải lên</Button>
+                  <p className="text-gray-500">
+                    {backIdFile ? backIdFile.name : 'Kéo và thả hoặc click để tải file lên'}
+                  </p>
+                  <input 
+                    type="file" 
+                    id="backId"
+                    className="hidden" 
+                    accept="image/*,.pdf"
+                    onChange={(e) => handleFileChange(e, 'back')}
+                  />
+                  <Button 
+                    type="button"
+                    className="mt-2 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => document.getElementById('backId')?.click()}
+                  >
+                    Chọn file
+                  </Button>
+                  {backIdFile && (
+                    <Button 
+                      type="button"
+                      className="mt-2 ml-2 bg-green-600 hover:bg-green-700"
+                      onClick={() => handleUpload('back')}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? 'Đang tải lên...' : 'Tải lên'}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
