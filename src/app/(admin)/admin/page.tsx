@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { Loader2, Home, Users, History, TrendingUp, ArrowUpCircle, ArrowDownCircle, Settings, Bell, HelpCircle, Edit, Trash2, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import { Loader2, Home, Users, History, TrendingUp, ArrowUpCircle, ArrowDownCircle, Settings, Bell, HelpCircle, Edit, Trash2, ChevronLeft, ChevronRight, Upload, FileText, CheckCircle, XCircle, Clock, Eye, User, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,10 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
+import { VerificationImageModal } from '@/components/admin/VerificationImageModal';
 import useSWR from 'swr';
 import UserMenu from '@/components/user-menu';
 
-type PageType = 'dashboard' | 'customers' | 'order-history' | 'trading-sessions' | 'deposit-requests' | 'withdrawal-requests' | 'settings';
+type PageType = 'dashboard' | 'customers' | 'order-history' | 'trading-sessions' | 'deposit-requests' | 'withdrawal-requests' | 'settings' | 'identity-verification';
 
 const menuItems = [
   { id: 'dashboard' as PageType, title: 'Dashboard', icon: Home },
@@ -26,6 +27,7 @@ const menuItems = [
   { id: 'deposit-requests' as PageType, title: 'Yêu cầu nạp tiền', icon: ArrowUpCircle },
   { id: 'withdrawal-requests' as PageType, title: 'Yêu cầu rút tiền', icon: ArrowDownCircle },
   { id: 'settings' as PageType, title: 'Cài đặt', icon: Settings },
+  { id: 'identity-verification' as PageType, title: 'Xác minh danh tính', icon: FileText },
 ];
 
 const fetcher = (url: string, token: string) =>
@@ -1259,6 +1261,208 @@ function SettingsPage({ token }: any) {
   );
 }
 
+// Identity Verification Page Component
+function IdentityVerificationPage({ token }: { token: string | null }) {
+  const { data, error, mutate } = useSWR(
+    token ? '/api/admin/verification-requests' : null,
+    (url) => fetcher(url, token!)
+  );
+  const [selectedRequest, setSelectedRequest] = useState<{
+    _id: string;
+    username: string;
+    fullName?: string;
+    verification: {
+      cccdFront: string;
+      cccdBack: string;
+      verified: boolean;
+    };
+    updatedAt: string | Date;
+    userName: string;
+  } | null>(null);
+  const { toast } = useToast();
+
+  const handleVerify = async (userId: string, status: boolean) => {
+    try {
+      const response = await fetch('/api/admin/verification-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId, status })
+      });
+
+      if (!response.ok) {
+        throw new Error('Có lỗi xảy ra khi cập nhật trạng thái xác minh');
+      }
+
+      // Làm mới dữ liệu
+      mutate();
+      
+      toast({
+        title: 'Thành công',
+        description: `Đã ${status ? 'chấp nhận' : 'từ chối'} yêu cầu xác minh`
+      });
+    } catch (error) {
+      console.error('Error updating verification status:', error);
+      toast({
+        title: 'Lỗi',
+        description: 'Có lỗi xảy ra khi cập nhật trạng thái xác minh',
+        variant: 'destructive'
+      });
+    }
+  };
+  
+  const handleViewImages = (request: any) => {
+    setSelectedRequest({
+      ...request,
+      userName: request.fullName || request.username
+    });
+  };
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+        <h3 className="text-lg font-medium mb-2">Đã xảy ra lỗi</h3>
+        <p className="text-gray-400 text-sm">Không thể tải dữ liệu yêu cầu xác minh</p>
+        <Button 
+          variant="outline" 
+          className="mt-4"
+          onClick={() => mutate()}
+        >
+          Thử lại
+        </Button>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
+        <p>Đang tải dữ liệu...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
+        <Home className="h-4 w-4" />
+        <span>/</span>
+        <span>Xác minh danh tính</span>
+      </div>
+
+      <Card className="bg-gray-800 border-gray-700">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg font-semibold">Yêu cầu xác minh danh tính</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => mutate()}
+              disabled={!data}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Làm mới
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Người dùng</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Ngày gửi</TableHead>
+                <TableHead className="text-right">Hành động</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.requests?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-gray-400">
+                    Không có yêu cầu xác minh nào đang chờ xử lý
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data.requests?.map((request: any) => (
+                  <TableRow key={request._id} className="hover:bg-gray-700/50">
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <User className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <div>{request.fullName || request.username}</div>
+                          <div className="text-xs text-gray-400">@{request.username}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={request.verified ? 'success' : 'warning'}>
+                        {request.verified ? 'Đã xác minh' : 'Chờ xử lý'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {new Date(request.updatedAt).toLocaleDateString('vi-VN')}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(request.updatedAt).toLocaleTimeString('vi-VN')}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewImages(request)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Xem ảnh
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleVerify(request._id, true)}
+                          disabled={request.verified}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Duyệt
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleVerify(request._id, false)}
+                          disabled={request.verified}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Từ chối
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          
+          {selectedRequest && (
+            <VerificationImageModal
+              isOpen={!!selectedRequest}
+              onClose={() => setSelectedRequest(null)}
+              frontImage={selectedRequest.verification.cccdFront}
+              backImage={selectedRequest.verification.cccdBack}
+              userName={selectedRequest.userName}
+            />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // Main Admin Dashboard Component
 export default function AdminDashboard() {
   const router = useRouter();
@@ -1339,6 +1543,7 @@ export default function AdminDashboard() {
           {currentPage === 'deposit-requests' && <DepositRequestsPage startDate={startDate} setStartDate={setStartDate} endDate={endDate} setEndDate={setEndDate} token={token} />}
           {currentPage === 'withdrawal-requests' && <WithdrawalRequestsPage startDate={startDate} setStartDate={setStartDate} endDate={endDate} setEndDate={setEndDate} token={token} />}
           {currentPage === 'settings' && <SettingsPage token={token} />}
+          {currentPage === 'identity-verification' && <IdentityVerificationPage token={token} />}
         </main>
       </div>
     </div>
