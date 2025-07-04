@@ -59,7 +59,7 @@ export default function Header() {
               src="/logo.png" 
               alt="London HSC" 
               width={120} 
-              height={40} 
+              height={100} 
               className="h-10 w-auto"
               priority
             />
