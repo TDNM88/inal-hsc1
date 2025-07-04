@@ -552,7 +552,7 @@ export default function TradePage() {
           {/* Số dư */}
           <Card>
             <CardHeader>
-              <CardTitle>Số dư khả dụng</CardTitle>
+              <CardTitle>Số dư</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
@@ -622,34 +622,6 @@ export default function TradePage() {
                     )}
                   </Button>
                 </div>
-                
-                <div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium mb-2">Thông tin giao dịch</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Số dư khả dụng:</span>
-                        <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(balance)} VND</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Số tiền đặt cược:</span>
-                        <span className="font-medium">
-                          {amount ? new Intl.NumberFormat('vi-VN').format(Number(amount)) : '0'} VND
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Tỷ lệ thắng:</span>
-                        <span className="font-medium text-green-600">1.8x</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Tiền thưởng dự kiến:</span>
-                        <span className="font-medium text-blue-600">
-                          {amount ? new Intl.NumberFormat('vi-VN').format(Number(amount) * 1.8) : '0'} VND
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -660,27 +632,9 @@ export default function TradePage() {
               <CardTitle>Thanh khoản</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Tổng thanh khoản:</span>
-                    <span className="font-medium">{formatCurrency(1000000000)} VND</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Đã sử dụng:</span>
-                    <span className="text-red-500">{formatCurrency(200000000)} VND</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Còn lại:</span>
-                    <span className="text-green-600">{formatCurrency(800000000)} VND</span>
-                  </div>
-                </div>
-                
                 <div className="mt-4">
-                  <h3 className="font-medium mb-2">Chi tiết thanh khoản</h3>
                   <LiquidityTable />
                 </div>
-              </div>
             </CardContent>
           </Card>
         </div>
