@@ -173,7 +173,7 @@ export default function Header() {
                     <span>Tổng quan tài khoản</span>
                   </DropdownMenuItem>
                   
-                  <DropdownMenuItem onClick={() => router.push("/security")}>
+                  <DropdownMenuItem onClick={() => router.push("/account?tab=password")}>
                     <span>Cài đặt bảo mật</span>
                   </DropdownMenuItem>
                   

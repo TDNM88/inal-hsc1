@@ -4,13 +4,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, ArrowUp, ArrowDown, ChevronDown, Plus, Minus, BarChart2, User, LogOut, AlertCircle, RefreshCw } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertCircle, ArrowDown, ArrowUp, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import LiquidityTable from '@/components/LiquidityTable';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import TradingViewAdvancedChart from "@/components/TradingViewAdvancedChart";
-import LiquidityTable from "@/components/LiquidityTable";
 import TradingViewTickerTape from "@/components/TradingViewTickerTape";
 import RightColumn from './RightCollum';
 
@@ -86,26 +86,6 @@ export default function TradePage() {
   const [error, setError] = useState<string | null>(null);
   
   // Khởi tạo currentSession với giá trị mặc định
-  const [currentSession, setCurrentSession] = useState<Session>(() => {
-    const now = new Date();
-    const { startTime, endTime } = getSessionTimeRange(now);
-    return {
-      sessionId: generateSessionId(now),
-      result: null,
-      status: 'pending',
-      startTime,
-      endTime
-    };
-  });
-  
-  const [pastSessions, setPastSessions] = useState<Session[]>([]);
-  const [futureSessions, setFutureSessions] = useState<Session[]>([]);
-
-  // Hàm định dạng tiền tệ
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN').format(value);
-  };
-
   // Hàm tạo ID phiên theo định dạng yymmddhhmm
   const generateSessionId = useCallback((time: Date): string => {
     const year = String(time.getFullYear()).slice(-2);
@@ -123,14 +103,37 @@ export default function TradePage() {
       time = new Date();
     }
     
+    // Thời gian bắt đầu là đầu phút hiện tại
     const startTime = new Date(time);
     startTime.setSeconds(0, 0);
     
+    // Thời gian kết thúc là đầu phút kế tiếp
     const endTime = new Date(startTime);
     endTime.setMinutes(endTime.getMinutes() + 1);
     
     return { startTime, endTime };
   }, []);
+
+  // Hàm định dạng tiền tệ
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('vi-VN').format(value);
+  };
+
+  // Khởi tạo state
+  const [currentSession, setCurrentSession] = useState<Session>(() => {
+    const now = new Date();
+    const { startTime, endTime } = getSessionTimeRange(now);
+    return {
+      sessionId: generateSessionId(now),
+      result: null,
+      status: 'pending',
+      startTime,
+      endTime
+    };
+  });
+  
+  const [pastSessions, setPastSessions] = useState<Session[]>([]);
+  const [futureSessions, setFutureSessions] = useState<Session[]>([]);
 
   // Hàm kiểm tra và cập nhật phiên hiện tại
   const checkAndUpdateSession = useCallback((now: Date) => {
@@ -543,32 +546,22 @@ export default function TradePage() {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Phần bên trái - Biểu đồ và đặt lệnh */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Thông tin phiên hiện tại */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Cột trái - Số dư, Đặt lệnh, Thanh khoản */}
+        <div className="space-y-4">
+          {/* Số dư */}
           <Card>
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-lg">
-                  Phiên hiện tại: <span className="text-blue-600">{currentSession?.sessionId || 'Đang tải...'}</span>
-                </CardTitle>
-                <div className="flex items-center">
-                  <span className="text-sm text-gray-500 mr-2">Kết thúc sau:</span>
-                  <span className="font-mono text-lg font-bold">
-                    {String(Math.floor(timeLeft / 10))}{timeLeft % 10}s
-                  </span>
-                </div>
-              </div>
+            <CardHeader>
+              <CardTitle>Số dư khả dụng</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[500px]">
-                <TradingViewAdvancedChart />
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(balance)} VND
               </div>
             </CardContent>
           </Card>
           
-          {/* Phần đặt lệnh */}
+          {/* Đặt lệnh */}
           <Card>
             <CardHeader>
               <CardTitle>Đặt lệnh giao dịch</CardTitle>
@@ -657,19 +650,110 @@ export default function TradePage() {
                     </div>
                   </div>
                 </div>
+                
+                <Button 
+                  className="w-full"
+                  disabled={!selectedAction || !amount || isSubmitting}
+                  onClick={handlePlaceOrder}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    'XÁC NHẬN ĐẶT LỆNH'
+                  )}
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              
+              <div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-medium mb-2">Thông tin giao dịch</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Số dư khả dụng:</span>
+                      <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(balance)} VND</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Số tiền đặt cược:</span>
+                      <span className="font-medium">
+                        {amount ? new Intl.NumberFormat('vi-VN').format(Number(amount)) : '0'} VND
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Tỷ lệ thắng:</span>
+                      <span className="font-medium text-green-600">1.8x</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Tiền thưởng dự kiến:</span>
+                      <span className="font-medium text-blue-600">
+                        {amount ? new Intl.NumberFormat('vi-VN').format(Number(amount) * 1.8) : '0'} VND
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+          </CardContent>
+        </Card>
         
-        {/* Phần bên phải - Thông tin và lịch sử */}
-        <div className="space-y-4">
-          <RightColumn 
-            isLoading={isLoading}
-            tradeHistory={tradeHistory}
-            formatCurrency={formatCurrency}
-          />
-        </div>
+        {/* Thanh khoản */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Thanh khoản</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tổng thanh khoản:</span>
+                  <span className="font-medium">{formatCurrency(1000000000)} VND</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Đã sử dụng:</span>
+                  <span className="text-red-500">{formatCurrency(200000000)} VND</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Còn lại:</span>
+                  <span className="text-green-600">{formatCurrency(800000000)} VND</span>
+                </div>
+              </div>
+              
+              <div className="mt-4">
+                <h3 className="font-medium mb-2">Chi tiết thanh khoản</h3>
+                <LiquidityTable />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Cột phải - Bảng giá, Lịch sử lệnh, Thông tin thị trường */}
+      <div className="lg:col-span-2 space-y-4">
+        {/* Thông tin phiên hiện tại */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg">
+                Phiên hiện tại: <span className="text-blue-600">{currentSession?.sessionId || 'Đang tải...'}</span>
+              </CardTitle>
+              <div className="flex items-center">
+                <span className="text-sm text-gray-500 mr-2">Kết thúc sau:</span>
+                <span className="font-mono text-lg font-bold">
+                  {String(Math.floor(timeLeft / 10))}{timeLeft % 10}s
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[500px]">
+              <TradingViewAdvancedChart />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <RightColumn 
+          isLoading={loading}
+          tradeHistory={tradeHistory}
+          formatCurrency={formatCurrency}
+        />
       </div>
       
       {/* Dialog xác nhận đặt lệnh */}
@@ -697,5 +781,6 @@ export default function TradePage() {
         </DialogContent>
       </Dialog>
     </div>
+  </div>
   );
 }

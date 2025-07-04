@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/useAuth';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Loader2 } from 'lucide-react';
 
 export default function AccountPage() {
   const { user, token, loading, logout } = useAuth();
@@ -16,6 +16,30 @@ export default function AccountPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   
+  // Sử dụng useEffect để đảm bảo chỉ chạy ở phía client
+  const [isClient, setIsClient] = useState(false);
+  
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
+  // Sử dụng searchParams một cách an toàn
+  let searchParams: URLSearchParams | null = null;
+  if (typeof window !== 'undefined') {
+    searchParams = new URLSearchParams(window.location.search);
+  }
+  
+  // Xử lý tham số tab từ URL
+  useEffect(() => {
+    if (!isClient) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab && ['overview', 'bank', 'verify', 'password'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [isClient]);
+  
   // Form state cho thông tin ngân hàng
   const [bankForm, setBankForm] = useState({
     fullName: '',
@@ -23,6 +47,16 @@ export default function AccountPage() {
     bankName: '',
     accountNumber: ''
   });
+  
+  // Form state cho đổi mật khẩu
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordError, setPasswordError] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  
   const [isSaving, setIsSaving] = useState(false);
   const [frontIdFile, setFrontIdFile] = useState<File | null>(null);
   const [backIdFile, setBackIdFile] = useState<File | null>(null);
@@ -128,6 +162,67 @@ export default function AccountPage() {
     setBankForm(prev => ({ ...prev, [name]: value }));
   };
   
+  // Xử lý đổi mật khẩu
+  const handleChangePassword = async () => {
+    // Kiểm tra dữ liệu đầu vào
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setPasswordError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('Mật khẩu mới và xác nhận mật khẩu không khớp');
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    try {
+      setIsUpdatingPassword(true);
+      setPasswordError('');
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Đổi mật khẩu thất bại');
+      }
+
+      // Đặt lại form và hiển thị thông báo thành công
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+
+      toast({
+        title: 'Thành công',
+        description: 'Đổi mật khẩu thành công',
+        variant: 'default'
+      });
+
+    } catch (error) {
+      console.error('Lỗi khi đổi mật khẩu:', error);
+      setPasswordError(error instanceof Error ? error.message : 'Đã xảy ra lỗi khi đổi mật khẩu');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+  
   // Submit bank information
   const handleSubmitBankInfo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,7 +286,7 @@ export default function AccountPage() {
     return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   };
 
-  return (
+return (
     <div className="min-h-[90vh] bg-[#0F1924] text-white flex flex-col md:flex-row">
       {/* Mobile menu button */}
       <div className="flex items-center justify-between p-4 md:hidden border-b border-gray-800">
@@ -405,65 +500,17 @@ export default function AccountPage() {
               <div>
                 <label className="block text-gray-400 mb-1">CMND/CCCD mặt trước</label>
                 <div className="border-2 border-dashed border-gray-700 p-6 rounded-lg text-center">
-                  <p className="text-gray-500">
-                    {frontIdFile ? frontIdFile.name : 'Kéo và thả hoặc click để tải file lên'}
-                  </p>
-                  <input 
-                    type="file" 
-                    id="frontId"
-                    className="hidden" 
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleFileChange(e, 'front')}
-                  />
-                  <Button 
-                    type="button"
-                    className="mt-2 bg-blue-600 hover:bg-blue-700"
-                    onClick={() => document.getElementById('frontId')?.click()}
-                  >
-                    Chọn file
-                  </Button>
-                  {frontIdFile && (
-                    <Button 
-                      type="button"
-                      className="mt-2 ml-2 bg-green-600 hover:bg-green-700"
-                      onClick={() => handleUpload('front')}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? 'Đang tải lên...' : 'Tải lên'}
-                    </Button>
-                  )}
+                  <p className="text-gray-500">Kéo và thả hoặc click để tải file lên</p>
+                  <input type="file" className="hidden" />
+                  <Button className="mt-2 bg-blue-600 hover:bg-blue-700">Tải lên</Button>
                 </div>
               </div>
               <div>
                 <label className="block text-gray-400 mb-1">CMND/CCCD mặt sau</label>
                 <div className="border-2 border-dashed border-gray-700 p-6 rounded-lg text-center">
-                  <p className="text-gray-500">
-                    {backIdFile ? backIdFile.name : 'Kéo và thả hoặc click để tải file lên'}
-                  </p>
-                  <input 
-                    type="file" 
-                    id="backId"
-                    className="hidden" 
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleFileChange(e, 'back')}
-                  />
-                  <Button 
-                    type="button"
-                    className="mt-2 bg-blue-600 hover:bg-blue-700"
-                    onClick={() => document.getElementById('backId')?.click()}
-                  >
-                    Chọn file
-                  </Button>
-                  {backIdFile && (
-                    <Button 
-                      type="button"
-                      className="mt-2 ml-2 bg-green-600 hover:bg-green-700"
-                      onClick={() => handleUpload('back')}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? 'Đang tải lên...' : 'Tải lên'}
-                    </Button>
-                  )}
+                  <p className="text-gray-500">Kéo và thả hoặc click để tải file lên</p>
+                  <input type="file" className="hidden" />
+                  <Button className="mt-2 bg-blue-600 hover:bg-blue-700">Tải lên</Button>
                 </div>
               </div>
             </div>

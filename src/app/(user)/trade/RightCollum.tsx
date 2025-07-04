@@ -27,24 +27,7 @@ const RightColumn: React.FC<RightColumnProps> = ({ isLoading, tradeHistory, form
         </CardContent>
       </Card>
 
-      {/* Chart */}
-      <Card className="bg-white border-gray-300 h-[650px] overflow-hidden rounded-md shadow">
-        <CardContent className="h-full w-full p-0">
-          {isLoading ? (
-            <div className="h-full w-full flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            </div>
-          ) : (
-            <TradingViewAdvancedChart
-              symbol="TVC:GOLD"
-              interval="1"
-              theme="dark"
-              height={460}
-              interactive={false}
-            />
-          )}
-        </CardContent>
-      </Card>
+
 
       {/* History */}
       <Card className="relative z-10 bg-white border-gray-300 rounded-md shadow">
