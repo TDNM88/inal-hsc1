@@ -17,6 +17,8 @@ export default function DepositPage() {
   const { toast } = useToast();
   const [amount, setAmount] = useState('');
   const [bill, setBill] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [billUrl, setBillUrl] = useState<string | null>(null);
 
   const { data: settings, error: settingsError } = useSWR(
     token ? '/api/admin/settings' : null,
@@ -32,7 +34,48 @@ export default function DepositPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setBill(e.target.files[0]);
+      const file = e.target.files[0];
+      setBill(file);
+      handleUploadFile(file);
+    }
+  };
+
+  const handleUploadFile = async (file: File) => {
+    setIsUploading(true);
+    setBillUrl(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload thất bại');
+      }
+      
+      const data = await response.json();
+      setBillUrl(data.url);
+      toast({
+        title: 'Thành công',
+        description: 'Tải lên ảnh thành công',
+      });
+    } catch (error) {
+      console.error('Lỗi khi tải lên ảnh:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: 'Không thể tải lên ảnh. Vui lòng thử lại.',
+      });
+      setBill(null);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -47,31 +90,41 @@ export default function DepositPage() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('amount', amount);
-    formData.append('bill', bill);
+    if (!billUrl) {
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng đợi ảnh được tải lên hoàn tất' });
+      return;
+    }
 
     try {
-      // Khi gửi FormData với file, không nên set Content-Type header
-      // vì trình duyệt sẽ tự động thiết lập với multipart/form-data và boundary phù hợp
       const res = await fetch('/api/deposits', {
         method: 'POST',
         headers: { 
-          Authorization: `Bearer ${token}`,
-          // Không set Content-Type khi gửi FormData có file
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        body: formData,
+        body: JSON.stringify({
+          amount: Number(amount),
+          bill: billUrl // Sử dụng URL đã tải lên thay vì gửi file trực tiếp
+        }),
       });
+      
       const result = await res.json();
+      
       if (res.ok) {
         toast({ title: 'Thành công', description: 'Yêu cầu nạp tiền đã được gửi' });
         setAmount('');
         setBill(null);
+        setBillUrl(null);
       } else {
-        toast({ variant: 'destructive', title: 'Lỗi', description: result.message });
+        toast({ variant: 'destructive', title: 'Lỗi', description: result.message || 'Có lỗi xảy ra' });
       }
     } catch (err) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể gửi yêu cầu' });
+      console.error('Lỗi khi gửi yêu cầu:', err);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Lỗi', 
+        description: 'Không thể gửi yêu cầu. Vui lòng thử lại sau.' 
+      });
     }
   };
 
@@ -133,25 +186,53 @@ export default function DepositPage() {
             </div>
             <div>
               <Label className="text-gray-400">Tải lên bill chuyển khoản</Label>
-              <div className="flex items-center gap-4">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="bg-gray-700 text-white border-gray-600 focus:border-blue-500 file:bg-gray-600 file:text-white file:hover:bg-gray-500"
-                />
-                {bill && (
-                  <span className="text-sm text-gray-400 truncate max-w-xs">{bill.name}</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    disabled={isUploading}
+                    className="bg-gray-700 text-white border-gray-600 focus:border-blue-500 file:bg-gray-600 file:text-white file:hover:bg-gray-500 disabled:opacity-50"
+                  />
+                </div>
+                
+                {isUploading && (
+                  <div className="flex items-center text-sm text-blue-400">
+                    <div className="h-4 w-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Đang tải lên ảnh...
+                  </div>
+                )}
+                
+                {bill && !isUploading && billUrl && (
+                  <div className="text-sm text-green-400">
+                    ✓ Đã tải lên: {bill.name}
+                  </div>
+                )}
+                
+                {bill && !isUploading && !billUrl && (
+                  <div className="text-sm text-yellow-400">
+                    Lỗi khi tải lên. Vui lòng thử lại.
+                  </div>
                 )}
               </div>
             </div>
             <Button
               className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-md transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
               onClick={handleSubmit}
-              disabled={!amount || !bill}
+              disabled={!amount || !bill || isUploading || !billUrl}
             >
-              <Upload className="h-5 w-5 mr-2" />
-              Gửi yêu cầu
+              {isUploading ? (
+                <>
+                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-5 w-5 mr-2" />
+                  Gửi yêu cầu
+                </>
+              )}
             </Button>
           </CardContent>
         </Card>

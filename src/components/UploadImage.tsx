@@ -41,14 +41,21 @@ const UploadImage: React.FC<UploadImageProps> = ({
 
     setFileList([newFile])
     onChange([{ ...newFile }])
-
-    const formData = new FormData()
-    formData.append("file", file)
-    formData.append("upload_preset", "bo-1234")
+    setIsUploading(true)
 
     try {
-      const response = await fetch("https://api.cloudinary.com/v1_1/deomyoxg6/image/upload", {
+      // Lấy token từ localStorage hoặc context người dùng
+      const token = localStorage.getItem('token') || ''
+      
+      // Sử dụng API upload để tải file lên Vercel Blob
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch("/api/upload", {
         method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       })
 
@@ -61,7 +68,7 @@ const UploadImage: React.FC<UploadImageProps> = ({
       const uploadedFile: UploadFile = {
         ...newFile,
         status: 'done',
-        url: data.secure_url,
+        url: data.url,
         response: data,
       }
 
