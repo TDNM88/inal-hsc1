@@ -1,23 +1,7 @@
 import { NextResponse } from 'next/server';
-import UserModel, { IUser } from '@/models/User';
-import { cookies } from 'next/headers';
-
-// Helper để lấy user từ token (chức năng tương tự getUserFromToken)
-const getUserFromToken = async (token: string) => {
-  // Trong môi trường thực tế, chúng ta sẽ verify JWT token
-  // Trong mock API này, chúng ta giả lập bằng cách parse một mock user ID
-  try {
-    // Giả lập user trong development
-    return {
-      id: 'mock_user_id',
-      username: 'tdnm',
-      role: token.includes('admin') ? 'admin' : 'user'
-    };
-  } catch (error) {
-    console.error('Error parsing token:', error);
-    return null;
-  }
-};
+import { getMongoDb } from '@/lib/db';
+import { verifyToken } from '@/lib/auth';
+import { ObjectId } from 'mongodb';
 
 // Interface cho bank data với thuộc tính verified
 interface BankData {
@@ -32,22 +16,33 @@ interface UserUpdate {
   bank?: BankData;
 }
 
-// Helper function để cập nhật thông tin người dùng
+// Helper function để cập nhật thông tin ngân hàng của người dùng
 const updateUserData = async (userId: string, updates: UserUpdate) => {
-  // Trong môi trường thực tế, chúng ta sẽ cập nhật database
-  // Trong mock API này, chúng ta trả về dữ liệu giả
-  
-  // Giả lập user đã cập nhật
-  return {
-    id: userId,
-    username: 'tdnm',
-    bank: {
-      name: updates.bank?.name || '',
-      accountNumber: updates.bank?.accountNumber || '',
-      accountHolder: updates.bank?.accountHolder || '',
-      verified: updates.bank?.verified || false
+  try {
+    const db = await getMongoDb();
+    if (!db) {
+      throw new Error('Không thể kết nối đến cơ sở dữ liệu');
     }
-  };
+    
+    // Tạo đối tượng ObjectId từ userId
+    const userObjectId = new ObjectId(userId);
+    
+    // Cập nhật thông tin ngân hàng cho người dùng
+    const result = await db.collection('users').findOneAndUpdate(
+      { _id: userObjectId },
+      { $set: { bank: updates.bank } },
+      { returnDocument: 'after' }
+    );
+    
+    if (!result) {
+      throw new Error('Không tìm thấy người dùng');
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error updating user bank info:', error);
+    throw error;
+  }
 };
 
 export async function POST(request: Request) {
@@ -59,10 +54,10 @@ export async function POST(request: Request) {
     }
 
     const token = authHeader.split(' ')[1];
-    const user = await getUserFromToken(token);
+    const user = await verifyToken(token);
     
-    if (!user) {
-      return NextResponse.json({ message: 'Không tìm thấy người dùng' }, { status: 404 });
+    if (!user || !user.id) {
+      return NextResponse.json({ message: 'Token không hợp lệ' }, { status: 401 });
     }
 
     // Lấy dữ liệu từ request body
@@ -108,7 +103,7 @@ export async function PUT(request: Request) {
     }
 
     const token = authHeader.split(' ')[1];
-    const admin = await getUserFromToken(token);
+    const admin = await verifyToken(token);
     
     if (!admin || admin.role !== 'admin') {
       return NextResponse.json({ message: 'Không có quyền truy cập' }, { status: 403 });

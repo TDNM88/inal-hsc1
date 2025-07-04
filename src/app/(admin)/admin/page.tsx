@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -52,31 +52,29 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: 
   const users = usersData?.users || [];
 
   return (
-    <div>
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
         <Home className="h-4 w-4" />
         <span>/</span>
         <span>Dashboard</span>
       </div>
-      <div className="mb-6">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium">Thời gian</span>
-          <div className="flex items-center gap-2">
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-32 h-8" />
-            <span>-</span>
-            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-32 h-8" />
-          </div>
-          <Button variant="outline" size="sm">Đặt lại</Button>
-          <Button size="sm" className="bg-green-600 hover:bg-green-700">Áp dụng</Button>
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
+        <span className="text-sm font-medium">Thời gian</span>
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full sm:w-32 h-8" />
+          <span>-</span>
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full sm:w-32 h-8" />
         </div>
+        <Button variant="outline" size="sm" className="w-full sm:w-auto">Đặt lại</Button>
+        <Button size="sm" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Áp dụng</Button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Tài khoản mới</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">{statsLoading ? '...' : stats.newUsers}</div>
+            <div className="text-xl font-bold text-green-500">{statsLoading ? '...' : stats.newUsers}</div>
           </CardContent>
         </Card>
         <Card className="bg-gray-800 border-gray-700">
@@ -84,7 +82,7 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: 
             <CardTitle className="text-sm font-medium text-gray-400">Tổng tiền nạp</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{statsLoading ? '...' : stats.totalDeposits.toLocaleString()} đ</div>
+            <div className="text-xl font-bold text-green-600">{statsLoading ? '...' : stats.totalDeposits.toLocaleString()} đ</div>
           </CardContent>
         </Card>
         <Card className="bg-gray-800 border-gray-700">
@@ -92,7 +90,7 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: 
             <CardTitle className="text-sm font-medium text-gray-400">Tổng tiền rút</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{statsLoading ? '...' : stats.totalWithdrawals.toLocaleString()}</div>
+            <div className="text-xl font-bold text-red-600">{statsLoading ? '...' : stats.totalWithdrawals.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card className="bg-gray-800 border-gray-700">
@@ -100,15 +98,15 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: 
             <CardTitle className="text-sm font-medium text-gray-400">Tài khoản</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">{statsLoading ? '...' : stats.totalUsers}</div>
+            <div className="text-xl font-bold text-green-500">{statsLoading ? '...' : stats.totalUsers}</div>
           </CardContent>
         </Card>
       </div>
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-white">Lệnh mới</CardTitle>
+          <CardTitle className="text-base font-semibold text-white">Lệnh mới</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {ordersLoading ? (
             <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
           ) : (
@@ -146,11 +144,11 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: 
           )}
         </CardContent>
       </Card>
-      <Card className="mt-8 bg-gray-800 border-gray-700">
+      <Card className="mt-6 bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-white">Người dùng mới</CardTitle>
+          <CardTitle className="text-base font-semibold text-white">Người dùng mới</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {usersLoading ? (
             <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
           ) : (
@@ -279,26 +277,26 @@ function CustomersPage({ token }: any) {
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
         <Home className="h-4 w-4" />
         <span>/</span>
         <span>Khách hàng</span>
       </div>
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Label>Tìm kiếm</Label>
           <Input
             placeholder="Tìm theo username, ID"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
+            className="w-full sm:w-64"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Label>Trạng thái</Label>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40 bg-gray-700 border-gray-600 text-white">
+            <SelectTrigger className="w-full sm:w-40 bg-gray-700 border-gray-600 text-white">
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700 text-white">
@@ -308,17 +306,17 @@ function CustomersPage({ token }: any) {
             </SelectContent>
           </Select>
         </div>
-        <Button variant="outline" size="sm">Đặt lại</Button>
-        <Button size="sm" className="bg-green-600 hover:bg-green-700">Áp dụng</Button>
+        <Button variant="outline" size="sm" className="w-full sm:w-auto">Đặt lại</Button>
+        <Button size="sm" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Áp dụng</Button>
       </div>
       <div className="flex justify-end mb-4">
-        <Button className="bg-green-600 hover:bg-green-700">+ Thêm tài khoản</Button>
+        <Button className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">+ Thêm tài khoản</Button>
       </div>
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-white">Danh sách khách hàng</CardTitle>
+          <CardTitle className="text-base font-semibold text-white">Danh sách khách hàng</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {isLoading ? (
             <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
           ) : (
@@ -426,7 +424,7 @@ function CustomersPage({ token }: any) {
             <DialogTitle>Update thông tin</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Tên đăng nhập</Label>
                 <Input value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} className="bg-gray-700 text-white" />
@@ -442,7 +440,7 @@ function CustomersPage({ token }: any) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Số dư</Label>
                 <Input
@@ -473,7 +471,7 @@ function CustomersPage({ token }: any) {
                   className="bg-gray-700 text-white"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label>CCCD mặt trước</Label>
                   <Button variant="outline" className="w-full mt-2 bg-transparent text-white border-gray-600">
@@ -492,7 +490,7 @@ function CustomersPage({ token }: any) {
             </div>
             <div>
               <h3 className="text-lg font-medium text-center mb-4">Thông tin ngân hàng</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <Label>Tên ngân hàng</Label>
                   <Input
@@ -522,9 +520,9 @@ function CustomersPage({ token }: any) {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowEditModal(false)} className="text-white border-gray-600">Đóng</Button>
-              <Button className="bg-green-600 hover:bg-green-700" onClick={handleSaveCustomer}>Lưu</Button>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setShowEditModal(false)} className="text-white border-gray-600 w-full sm:w-auto">Đóng</Button>
+              <Button className="bg-green-600 hover:bg-green-700 w-full sm:w-auto" onClick={handleSaveCustomer}>Lưu</Button>
             </div>
           </div>
         </DialogContent>
@@ -567,25 +565,25 @@ function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate, tok
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
         <Home className="h-4 w-4" />
         <span>/</span>
         <span>Yêu cầu nạp tiền</span>
       </div>
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Label>Khách hàng</Label>
           <Input
             placeholder="Khách hàng"
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
-            className="w-48 bg-gray-700 text-white"
+            className="w-full sm:w-48 bg-gray-700 text-white"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40 bg-gray-700 border-gray-600 text-white">
+            <SelectTrigger className="w-full sm:w-40 bg-gray-700 border-gray-600 text-white">
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700 text-white">
@@ -596,16 +594,16 @@ function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate, tok
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40 bg-gray-700 text-white" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full sm:w-40 bg-gray-700 text-white" />
           <span>-</span>
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40 bg-gray-700 text-white" />
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full sm:w-40 bg-gray-700 text-white" />
         </div>
-        <Button variant="outline" size="sm" className="text-white border-gray-600">Đặt lại</Button>
-        <Button size="sm" className="bg-green-600 hover:bg-green-700">Áp dụng</Button>
+        <Button variant="outline" size="sm" className="w-full sm:w-auto text-white border-gray-600">Đặt lại</Button>
+        <Button size="sm" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Áp dụng</Button>
       </div>
       <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           {isLoading ? (
             <div className="flex justify-center p-6"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
           ) : (
@@ -646,17 +644,17 @@ function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate, tok
                       <div className="flex gap-2">
                         {deposit.status === 'Chờ duyệt' ? (
                           <>
-                            <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => updateDepositStatus(deposit._id, 'Đã duyệt')}>
+                            <Button size="sm" className="bg-green-500 hover:bg-green-600 w-full sm:w-auto" onClick={() => updateDepositStatus(deposit._id, 'Đã duyệt')}>
                               Phê duyệt
                             </Button>
-                            <Button size="sm" variant="outline" className="text-gray-600 bg-transparent border-gray-600" onClick={() => updateDepositStatus(deposit._id, 'Từ chối')}>
+                            <Button size="sm" variant="outline" className="text-gray-600 bg-transparent border-gray-600 w-full sm:w-auto" onClick={() => updateDepositStatus(deposit._id, 'Từ chối')}>
                               Từ chối
                             </Button>
                           </>
                         ) : (
                           <>
-                            <Button size="sm" variant="outline" className="text-gray-400 bg-transparent border-gray-600" disabled>Phê duyệt</Button>
-                            <Button size="sm" variant="outline" className="text-gray-400 bg-transparent border-gray-600" disabled>Từ chối</Button>
+                            <Button size="sm" variant="outline" className="text-gray-400 bg-transparent border-gray-600 w-full sm:w-auto" disabled>Phê duyệt</Button>
+                            <Button size="sm" variant="outline" className="text-gray-400 bg-transparent border-gray-600 w-full sm:w-auto" disabled>Từ chối</Button>
                           </>
                         )}
                       </div>
@@ -686,26 +684,26 @@ function OrderHistoryPage({ startDate, setStartDate, endDate, setEndDate, token 
   const orders = data?.orders || [];
 
   return (
-    <div>
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
         <Home className="h-4 w-4" />
         <span>/</span>
         <span>Lịch sử đặt lệnh</span>
       </div>
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Label>Khách hàng</Label>
           <Input
             placeholder="Tên khách hàng"
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
-            className="w-48 bg-gray-700 text-white"
+            className="w-full sm:w-48 bg-gray-700 text-white"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Label>Trạng thái</Label>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40 bg-gray-700 border-gray-600 text-white">
+            <SelectTrigger className="w-full sm:w-40 bg-gray-700 border-gray-600 text-white">
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700 text-white">
@@ -715,16 +713,16 @@ function OrderHistoryPage({ startDate, setStartDate, endDate, setEndDate, token 
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40 bg-gray-700 text-white" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full sm:w-40 bg-gray-700 text-white" />
           <span>-</span>
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40 bg-gray-700 text-white" />
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full sm:w-40 bg-gray-700 text-white" />
         </div>
-        <Button variant="outline" size="sm" className="text-white border-gray-600">Đặt lại</Button>
-        <Button size="sm" className="bg-green-600 hover:bg-green-700">Áp dụng</Button>
+        <Button variant="outline" size="sm" className="w-full sm:w-auto text-white border-gray-600">Đặt lại</Button>
+        <Button size="sm" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Áp dụng</Button>
       </div>
       <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           {isLoading ? (
             <div className="flex justify-center p-6"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
           ) : (
@@ -774,22 +772,15 @@ function TradingSessionsPage({ token }: any) {
   const [countdown, setCountdown] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // State để lưu trữ dữ liệu các phiên
   const [sessions, setSessions] = useState<any[]>([]);
   const [currentSession, setCurrentSession] = useState<any>({ sessionId: 'N/A', result: 'Chưa có', startTime: 'N/A', endTime: 'N/A' });
   const [futureSessions, setFutureSessions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Hàm tạo kết quả ngẫu nhiên (Lên hoặc Xuống)
-  const generateRandomResult = () => {
-    return Math.random() > 0.5 ? 'Lên' : 'Xuống';
-  };
-
-  // Hàm tạo ID phiên từ thời gian
+  const generateRandomResult = () => Math.random() > 0.5 ? 'Lên' : 'Xuống';
   const generateSessionId = (time: Date) => {
-    // Format: yymmddhhmm (năm-tháng-ngày-giờ-phút)
-    const year = String(time.getFullYear()).slice(-2); // lấy 2 chữ số cuối của năm
+    const year = String(time.getFullYear()).slice(-2);
     const month = String(time.getMonth() + 1).padStart(2, '0');
     const day = String(time.getDate()).padStart(2, '0');
     const hours = String(time.getHours()).padStart(2, '0');
@@ -797,7 +788,6 @@ function TradingSessionsPage({ token }: any) {
     return `${year}${month}${day}${hours}${minutes}`;
   };
 
-  // Hàm khởi tạo 30 phiên tương lai với kết quả ngẫu nhiên
   const generateFutureSessions = (startFromTime: Date) => {
     const sessions = [];
     let currentMin = startFromTime.getMinutes();
@@ -814,7 +804,6 @@ function TradingSessionsPage({ token }: any) {
         if (currentHour >= 24) {
           currentHour = 0;
           currentDay++;
-          // Giả định đơn giản, không xử lý chuyển tháng/năm
         }
       }
       
@@ -833,92 +822,61 @@ function TradingSessionsPage({ token }: any) {
     return sessions;
   };
   
-  // Cập nhật thời gian hiện tại và đồng hồ đếm ngược
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
       setCurrentTime(now);
-      // Tính toán số giây còn lại trong phiên hiện tại
       setCountdown(59 - now.getSeconds());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
   
-  // Cập nhật dữ liệu phiên khi thời gian thay đổi
   useEffect(() => {
     const now = new Date();
     
-    // Tạo thông tin về phiên hiện tại
-    const currentSessionStartTime = new Date(
-      now.getFullYear(), 
-      now.getMonth(), 
-      now.getDate(), 
-      now.getHours(), 
-      now.getMinutes(), 
-      0
-    );
+    const currentSessionStartTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0);
+    const currentSessionEndTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 59);
     
-    const currentSessionEndTime = new Date(
-      now.getFullYear(), 
-      now.getMonth(), 
-      now.getDate(), 
-      now.getHours(), 
-      now.getMinutes(), 
-      59
-    );
-    
-    // Kiểm tra nếu phút hiện tại khác với phút của phiên hiện tại
-    // nghĩa là phiên đã thay đổi
     if (currentSession.sessionId !== generateSessionId(now)) {
-      // Tạo phiên hiện tại mới
       const newCurrentSession = {
         sessionId: generateSessionId(now),
-        result: generateRandomResult(), // Kết quả ngẫu nhiên
+        result: generateRandomResult(),
         startTime: currentSessionStartTime.toISOString(),
         endTime: currentSessionEndTime.toISOString(),
         status: 'active'
       };
       
       setCurrentSession(newCurrentSession);
-      
-      // Tạo lại 30 phiên tương lai
       const newFutureSessions = generateFutureSessions(now);
       setFutureSessions(newFutureSessions);
-      
-      // Gộp phiên hiện tại và các phiên tương lai để hiển thị
       setSessions([newCurrentSession, ...newFutureSessions.slice(0, sessionsPerPage - 1)]);
-      
-      // Tính tổng số trang
       setTotalPages(Math.ceil((1 + newFutureSessions.length) / sessionsPerPage));
       setIsLoading(false);
     }
   }, [currentTime, currentSession.sessionId]);
   
-  // Xử lý thay đổi trang
   useEffect(() => {
     if (currentPage === 1) {
-      // Trang 1: Phiên hiện tại + các phiên tương lai đầu tiên
       setSessions([currentSession, ...futureSessions.slice(0, sessionsPerPage - 1)]);
     } else {
-      // Các trang khác: Chỉ hiển thị phiên tương lai tương ứng
       const startIndex = (currentPage - 1) * sessionsPerPage - 1;
       setSessions(futureSessions.slice(startIndex, startIndex + sessionsPerPage));
     }
   }, [currentPage, currentSession, futureSessions]);
 
   return (
-    <div>
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
         <Home className="h-4 w-4" />
         <span>/</span>
         <span>Phiên giao dịch</span>
       </div>
-      <div className="flex justify-center mb-8">
-        <Card className="w-80 text-center bg-gray-800 border-gray-700">
-          <CardContent className="pt-6">
+      <div className="flex justify-center mb-6">
+        <Card className="w-full sm:w-80 text-center bg-gray-800 border-gray-700">
+          <CardContent className="pt-4">
             <div className="space-y-2">
-              <div className="text-lg font-semibold text-white">Phiên: {currentSession.sessionId}</div>
-              <div className="text-3xl font-bold text-red-500">{countdown}s</div>
+              <div className="text-base sm:text-lg font-semibold text-white">Phiên: {currentSession.sessionId}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-red-500">{countdown}s</div>
               <div className="text-sm text-white">
                 Kết quả: <span className={`font-semibold ${currentSession.result === 'Lên' ? 'text-green-600' : 'text-red-600'}`}>{currentSession.result}</span>
               </div>
@@ -928,9 +886,9 @@ function TradingSessionsPage({ token }: any) {
       </div>
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-white">Lịch sử phiên</CardTitle>
+          <CardTitle className="text-base font-semibold text-white">Lịch sử phiên</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {isLoading ? (
             <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
           ) : (
@@ -979,15 +937,15 @@ function TradingSessionsPage({ token }: any) {
           )}
         </CardContent>
       </Card>
-      <div className="flex items-center justify-between mt-4">
-        <div className="text-sm text-gray-400">{sessionsPerPage} / page</div>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-center justify-between mt-4">
+        <div className="text-sm text-gray-400 mb-2 sm:mb-0">{sessionsPerPage} / page</div>
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            className="text-white border-gray-600"
+            className="text-white border-gray-600 w-full sm:w-auto"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -996,7 +954,7 @@ function TradingSessionsPage({ token }: any) {
               key={page}
               variant="outline"
               size="sm"
-              className={currentPage === page ? 'bg-blue-600 text-white' : 'text-white border-gray-600'}
+              className={currentPage === page ? 'bg-blue-600 text-white' : 'text-white border-gray-600 w-full sm:w-auto'}
               onClick={() => setCurrentPage(page)}
             >
               {page}
@@ -1007,7 +965,7 @@ function TradingSessionsPage({ token }: any) {
             size="sm"
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            className="text-white border-gray-600"
+            className="text-white border-gray-600 w-full sm:w-auto"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -1051,26 +1009,26 @@ function WithdrawalRequestsPage({ startDate, setStartDate, endDate, setEndDate, 
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
         <Home className="h-4 w-4" />
         <span>/</span>
         <span>Yêu cầu rút tiền</span>
       </div>
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Label>Khách hàng</Label>
           <Input
             placeholder="Khách hàng"
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
-            className="w-48 bg-gray-700 text-white"
+            className="w-full sm:w-48 bg-gray-700 text-white"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Label>Trạng thái</Label>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40 bg-gray-700 border-gray-600 text-white">
+            <SelectTrigger className="w-full sm:w-40 bg-gray-700 border-gray-600 text-white">
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700 text-white">
@@ -1081,16 +1039,16 @@ function WithdrawalRequestsPage({ startDate, setStartDate, endDate, setEndDate, 
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40 bg-gray-700 text-white" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full sm:w-40 bg-gray-700 text-white" />
           <span>-</span>
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40 bg-gray-700 text-white" />
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full sm:w-40 bg-gray-700 text-white" />
         </div>
-        <Button variant="outline" size="sm" className="text-white border-gray-600">Đặt lại</Button>
-        <Button size="sm" className="bg-green-600 hover:bg-green-700">Áp dụng</Button>
+        <Button variant="outline" size="sm" className="w-full sm:w-auto text-white border-gray-600">Đặt lại</Button>
+        <Button size="sm" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Áp dụng</Button>
       </div>
       <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           {isLoading ? (
             <div className="flex justify-center p-6"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
           ) : (
@@ -1133,17 +1091,17 @@ function WithdrawalRequestsPage({ startDate, setStartDate, endDate, setEndDate, 
                       <div className="flex gap-2">
                         {withdrawal.status === 'Chờ duyệt' ? (
                           <>
-                            <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => updateWithdrawalStatus(withdrawal._id, 'Đã duyệt')}>
+                            <Button size="sm" className="bg-green-500 hover:bg-green-600 w-full sm:w-auto" onClick={() => updateWithdrawalStatus(withdrawal._id, 'Đã duyệt')}>
                               Phê duyệt
                             </Button>
-                            <Button size="sm" variant="outline" className="text-gray-600 bg-transparent border-gray-600" onClick={() => updateWithdrawalStatus(withdrawal._id, 'Từ chối')}>
+                            <Button size="sm" variant="outline" className="text-gray-600 bg-transparent border-gray-600 w-full sm:w-auto" onClick={() => updateWithdrawalStatus(withdrawal._id, 'Từ chối')}>
                               Từ chối
                             </Button>
                           </>
                         ) : (
                           <>
-                            <Button size="sm" variant="outline" className="text-gray-400 bg-transparent border-gray-600" disabled>Phê duyệt</Button>
-                            <Button size="sm" variant="outline" className="text-gray-400 bg-transparent border-gray-600" disabled>Từ chối</Button>
+                            <Button size="sm" variant="outline" className="text-gray-400 bg-transparent border-gray-600 w-full sm:w-auto" disabled>Phê duyệt</Button>
+                            <Button size="sm" variant="outline" className="text-gray-400 bg-transparent border-gray-600 w-full sm:w-auto" disabled>Từ chối</Button>
                           </>
                         )}
                       </div>
@@ -1203,15 +1161,15 @@ function SettingsPage({ token }: any) {
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
         <Home className="h-4 w-4" />
         <span>/</span>
         <span>Cài đặt</span>
       </div>
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-white">Cài đặt hệ thống</CardTitle>
+          <CardTitle className="text-base font-semibold text-white">Cài đặt hệ thống</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -1220,7 +1178,7 @@ function SettingsPage({ token }: any) {
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium text-white mb-4">Thông tin ngân hàng</h3>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <Label>Tên ngân hàng</Label>
                     <Input
@@ -1249,7 +1207,7 @@ function SettingsPage({ token }: any) {
               </div>
               <div>
                 <h3 className="text-lg font-medium text-white mb-4">Hạn mức giao dịch</h3>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <Label>Nạp tối thiểu</Label>
                     <Input
@@ -1291,7 +1249,7 @@ function SettingsPage({ token }: any) {
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button className="bg-green-600 hover:bg-green-700" onClick={handleSaveSettings}>Lưu</Button>
+                <Button className="bg-green-600 hover:bg-green-700 w-full sm:w-auto" onClick={handleSaveSettings}>Lưu</Button>
               </div>
             </div>
           )}
@@ -1308,7 +1266,7 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Collapsed by default on mobile
   const { toast } = useToast();
 
   useEffect(() => {
@@ -1327,17 +1285,22 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-900 text-white">
+    <div className="flex flex-col sm:flex-row min-h-screen bg-gray-900 text-white">
       {/* Sidebar */}
-      <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 border-r border-gray-700 flex flex-col justify-between`}>
+      <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 border-r border-gray-700 flex flex-col justify-between sm:sticky top-0`}>
         <div>
-          <div className="flex items-center justify-between p-4">
-            {!isSidebarCollapsed && <span className="text-lg font-semibold">Admin Dashboard</span>}
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}>
+          <div className="flex items-center justify-between p-2 sm:p-4">
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="sm:hidden">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+              </svg>
+            </Button>
+            {!isSidebarCollapsed && <span className="text-sm sm:text-lg font-semibold">Admin Dashboard</span>}
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="hidden sm:block">
               {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </Button>
           </div>
-          <nav className="space-y-2 px-2">
+          <nav className="space-y-1 px-2">
             {menuItems.map((item) => (
               <Button
                 key={item.id}
@@ -1346,29 +1309,29 @@ export default function AdminDashboard() {
                 onClick={() => setCurrentPage(item.id)}
               >
                 <item.icon className="h-5 w-5 mr-2" />
-                {!isSidebarCollapsed && <span>{item.title}</span>}
+                {!isSidebarCollapsed && <span className="text-sm">{item.title}</span>}
               </Button>
             ))}
           </nav>
         </div>
-        <div className="p-4">
+        <div className="p-2 sm:p-4">
           <Button variant="ghost" className="w-full justify-start">
             <HelpCircle className="h-5 w-5 mr-2" />
-            {!isSidebarCollapsed && <span>Hỗ trợ</span>}
+            {!isSidebarCollapsed && <span className="text-sm">Hỗ trợ</span>}
           </Button>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <header className="flex items-center justify-between p-4 border-b border-gray-700">
-          <div className="flex items-center gap-4">
+        <header className="flex items-center justify-between p-2 sm:p-4 border-b border-gray-700">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Bell className="h-5 w-5 text-gray-400" />
             <span className="text-sm text-gray-400">Thông báo</span>
           </div>
           <UserMenu user={user} logout={logout} />
         </header>
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-2 sm:p-6 overflow-auto">
           {currentPage === 'dashboard' && <DashboardPage startDate={startDate} setStartDate={setStartDate} endDate={endDate} setEndDate={setEndDate} token={token} />}
           {currentPage === 'customers' && <CustomersPage token={token} />}
           {currentPage === 'order-history' && <OrderHistoryPage startDate={startDate} setStartDate={setStartDate} endDate={endDate} setEndDate={setEndDate} token={token} />}

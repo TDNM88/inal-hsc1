@@ -49,3 +49,13 @@ export async function connectToDatabase() {
 
   return cached.conn;
 }
+
+/**
+ * Hàm trợ giúp để lấy MongoDB client connection từ mongoose
+ * Sử dụng trong các API route để truy cập collection
+ */
+export async function getMongoDb() {
+  await connectToDatabase();
+  // Truy cập db trực tiếp từ mongoose.connection
+  return mongoose.connection.db;
+}
