@@ -650,137 +650,97 @@ export default function TradePage() {
                     </div>
                   </div>
                 </div>
-                
-                <Button 
-                  className="w-full"
-                  disabled={!selectedAction || !amount || isSubmitting}
-                  onClick={handlePlaceOrder}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    'XÁC NHẬN ĐẶT LỆNH'
-                  )}
-                </Button>
               </div>
-              
-              <div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-medium mb-2">Thông tin giao dịch</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Số dư khả dụng:</span>
-                      <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(balance)} VND</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Số tiền đặt cược:</span>
-                      <span className="font-medium">
-                        {amount ? new Intl.NumberFormat('vi-VN').format(Number(amount)) : '0'} VND
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Tỷ lệ thắng:</span>
-                      <span className="font-medium text-green-600">1.8x</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Tiền thưởng dự kiến:</span>
-                      <span className="font-medium text-blue-600">
-                        {amount ? new Intl.NumberFormat('vi-VN').format(Number(amount) * 1.8) : '0'} VND
-                      </span>
-                    </div>
+            </CardContent>
+          </Card>
+          
+          {/* Thanh khoản */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Thanh khoản</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Tổng thanh khoản:</span>
+                    <span className="font-medium">{formatCurrency(1000000000)} VND</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Đã sử dụng:</span>
+                    <span className="text-red-500">{formatCurrency(200000000)} VND</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Còn lại:</span>
+                    <span className="text-green-600">{formatCurrency(800000000)} VND</span>
                   </div>
                 </div>
+                
+                <div className="mt-4">
+                  <h3 className="font-medium mb-2">Chi tiết thanh khoản</h3>
+                  <LiquidityTable />
+                </div>
               </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
         
-        {/* Thanh khoản */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Thanh khoản</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Tổng thanh khoản:</span>
-                  <span className="font-medium">{formatCurrency(1000000000)} VND</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Đã sử dụng:</span>
-                  <span className="text-red-500">{formatCurrency(200000000)} VND</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Còn lại:</span>
-                  <span className="text-green-600">{formatCurrency(800000000)} VND</span>
+        {/* Cột phải - Bảng giá, Lịch sử lệnh, Thông tin thị trường */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Thông tin phiên hiện tại */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-lg">
+                  Phiên hiện tại: <span className="text-blue-600">{currentSession?.sessionId || 'Đang tải...'}</span>
+                </CardTitle>
+                <div className="flex items-center">
+                  <span className="text-sm text-gray-500 mr-2">Kết thúc sau:</span>
+                  <span className="font-mono text-lg font-bold">
+                    {String(Math.floor(timeLeft / 10))}{timeLeft % 10}s
+                  </span>
                 </div>
               </div>
-              
-              <div className="mt-4">
-                <h3 className="font-medium mb-2">Chi tiết thanh khoản</h3>
-                <LiquidityTable />
+            </CardHeader>
+            <CardContent>
+              <div className="h-[500px]">
+                <TradingViewAdvancedChart />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Cột phải - Bảng giá, Lịch sử lệnh, Thông tin thị trường */}
-      <div className="lg:col-span-2 space-y-4">
-        {/* Thông tin phiên hiện tại */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">
-                Phiên hiện tại: <span className="text-blue-600">{currentSession?.sessionId || 'Đang tải...'}</span>
-              </CardTitle>
-              <div className="flex items-center">
-                <span className="text-sm text-gray-500 mr-2">Kết thúc sau:</span>
-                <span className="font-mono text-lg font-bold">
-                  {String(Math.floor(timeLeft / 10))}{timeLeft % 10}s
-                </span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[500px]">
-              <TradingViewAdvancedChart />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          
+          <RightColumn 
+            isLoading={loading}
+            tradeHistory={tradeHistory}
+            formatCurrency={formatCurrency}
+          />
+        </div>
         
-        <RightColumn 
-          isLoading={loading}
-          tradeHistory={tradeHistory}
-          formatCurrency={formatCurrency}
-        />
+        {/* Dialog xác nhận đặt lệnh */}
+        <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Xác nhận đặt lệnh</DialogTitle>
+              <DialogDescription>
+                Bạn có chắc chắn muốn đặt lệnh {selectedAction === 'UP' ? 'TĂNG' : 'GIẢM'} với số tiền {new Intl.NumberFormat('vi-VN').format(Number(amount))} VND?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsConfirming(false)}>Hủy</Button>
+              <Button 
+                onClick={confirmPlaceOrder}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  'Xác nhận'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-      
-      {/* Dialog xác nhận đặt lệnh */}
-      <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận đặt lệnh</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn đặt lệnh {selectedAction === 'UP' ? 'TĂNG' : 'GIẢM'} với số tiền {new Intl.NumberFormat('vi-VN').format(Number(amount))} VND?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsConfirming(false)}>Hủy</Button>
-            <Button 
-              onClick={confirmPlaceOrder}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                'Xác nhận'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
-  </div>
   );
 }
