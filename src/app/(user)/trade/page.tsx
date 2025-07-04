@@ -641,13 +641,16 @@ export default function TradePage() {
         
         {/* Cột phải - Bảng giá, Lịch sử lệnh, Thông tin thị trường */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Thông tin phiên hiện tại */}
+          <Card>
+            <CardContent>
+              <div className="h-[500px]">
+                <TradingViewAdvancedChart />
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader className="pb-2">
               <div className="flex justify-between items-center">
-                <CardTitle className="text-lg">
-                  Phiên hiện tại: <span className="text-blue-600">{currentSession?.sessionId || 'Đang tải...'}</span>
-                </CardTitle>
                 <div className="flex items-center">
                   <span className="text-sm text-gray-500 mr-2">Kết thúc sau:</span>
                   <span className="font-mono text-lg font-bold">
@@ -656,11 +659,6 @@ export default function TradePage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="h-[500px]">
-                <TradingViewAdvancedChart />
-              </div>
-            </CardContent>
           </Card>
           
           <RightColumn 
