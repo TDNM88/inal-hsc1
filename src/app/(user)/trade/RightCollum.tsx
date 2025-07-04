@@ -30,7 +30,7 @@ const RightColumn: React.FC<RightColumnProps> = ({ isLoading, tradeHistory, form
       {/* Advanced Chart */}
       <Card className="bg-white border-gray-300 rounded-md shadow">
         <CardContent className="p-0">
-          <TradingViewAdvancedChart symbol="XAU/USD" interval="1m" />
+          <TradingViewAdvancedChart symbol="GOLD" interval="1m" />
         </CardContent>
       </Card>
 
