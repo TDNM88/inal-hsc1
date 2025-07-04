@@ -15,7 +15,7 @@ export default function TradingViewAdvancedChart({
   symbol = 'TVC:GOLD',
   interval = '15',
   theme = 'dark',
-  height = 500,
+  height = '100%',
   style = 1,
   interactive = true,
 }: TradingViewAdvancedChartProps) {

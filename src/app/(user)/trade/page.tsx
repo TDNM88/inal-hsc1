@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import LiquidityTable from '@/components/LiquidityTable';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import TradingViewTickerTape from "@/components/TradingViewTickerTape";
 import RightColumn from './RightCollum';
 
 // Constants
@@ -77,7 +76,6 @@ export default function TradePage() {
   }>({ status: "idle" });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [currentAmount, setCurrentAmount] = useState<string>('');
   const [countdown, setCountdown] = useState(59);
   const [balance, setBalance] = useState<number>(0);
   const [userOrders, setUserOrders] = useState<Order[]>([]);
@@ -606,7 +604,7 @@ export default function TradePage() {
                 </DialogHeader>
                 <DialogDescription className="text-gray-300 text-center">
                   XÁC NHẬN
-                  </DialogDescription>
+                </DialogDescription>
                 <DialogFooter className="flex gap-2">
                   <Button
                     type="button"

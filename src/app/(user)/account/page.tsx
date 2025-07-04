@@ -501,16 +501,68 @@ return (
                 <label className="block text-gray-400 mb-1">CMND/CCCD mặt trước</label>
                 <div className="border-2 border-dashed border-gray-700 p-6 rounded-lg text-center">
                   <p className="text-gray-500">Kéo và thả hoặc click để tải file lên</p>
-                  <input type="file" className="hidden" />
-                  <Button className="mt-2 bg-blue-600 hover:bg-blue-700">Tải lên</Button>
+                  <input 
+                    id="frontId"
+                    type="file" 
+                    className="hidden" 
+                    onChange={(e) => handleFileChange(e, 'front')}
+                    accept="image/*,.pdf"
+                  />
+                  <Button 
+                    type="button"
+                    className="mt-2 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => document.getElementById('frontId')?.click()}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? 'Đang tải lên...' : 'Chọn file'}
+                  </Button>
+                  {frontIdFile && (
+                    <div className="mt-2 text-sm text-gray-400">
+                      Đã chọn: {frontIdFile.name}
+                      <Button 
+                        type="button"
+                        className="ml-2 bg-green-600 hover:bg-green-700 text-xs py-0 h-6"
+                        onClick={() => handleUpload('front')}
+                        disabled={isUploading}
+                      >
+                        Tải lên
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
                 <label className="block text-gray-400 mb-1">CMND/CCCD mặt sau</label>
                 <div className="border-2 border-dashed border-gray-700 p-6 rounded-lg text-center">
                   <p className="text-gray-500">Kéo và thả hoặc click để tải file lên</p>
-                  <input type="file" className="hidden" />
-                  <Button className="mt-2 bg-blue-600 hover:bg-blue-700">Tải lên</Button>
+                  <input 
+                    id="backId"
+                    type="file" 
+                    className="hidden" 
+                    onChange={(e) => handleFileChange(e, 'back')}
+                    accept="image/*,.pdf"
+                  />
+                  <Button 
+                    type="button"
+                    className="mt-2 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => document.getElementById('backId')?.click()}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? 'Đang tải lên...' : 'Chọn file'}
+                  </Button>
+                  {backIdFile && (
+                    <div className="mt-2 text-sm text-gray-400">
+                      Đã chọn: {backIdFile.name}
+                      <Button 
+                        type="button"
+                        className="ml-2 bg-green-600 hover:bg-green-700 text-xs py-0 h-6"
+                        onClick={() => handleUpload('back')}
+                        disabled={isUploading}
+                      >
+                        Tải lên
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

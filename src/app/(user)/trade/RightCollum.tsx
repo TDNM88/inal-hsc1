@@ -27,12 +27,13 @@ const RightColumn: React.FC<RightColumnProps> = ({ isLoading, tradeHistory, form
         </CardContent>
       </Card>
 
-      {/* Advanced Chart */}
-      <Card className="bg-white border-gray-300 rounded-md shadow">
-        <CardContent className="p-0">
-          <TradingViewAdvancedChart symbol="GOLD" interval="1m" />
+      <Card className="bg-white border-gray-500 rounded-md shadow h-[600px]">
+        <CardContent className="p-2 h-full">
+          <TradingViewAdvancedChart />
         </CardContent>
       </Card>
+
+
 
       {/* History */}
       <Card className="relative z-10 bg-white border-gray-300 rounded-md shadow">
