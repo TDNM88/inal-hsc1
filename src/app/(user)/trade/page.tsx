@@ -721,7 +721,17 @@ export default function TradePage() {
             </Dialog>
 
             <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-4 space-y-6">
+              {/* Cột bên phải hiển thị đầu tiên trên mobile để đưa bảng giá lên đầu */}
+              <div className="lg:col-span-8 lg:order-2 order-1">
+                <RightColumn
+                  isLoading={isLoading}
+                  tradeHistory={tradeHistory}
+                  formatCurrency={formatCurrency}
+                />
+              </div>
+
+              {/* Cột bên trái hiển thị thứ hai trên mobile */}
+              <div className="lg:col-span-4 space-y-6 lg:order-1 order-2">
                 <Card className="bg-white border border-gray-300 rounded-md shadow">
                   <CardHeader>
                     <div className="flex items-center space-x-2">
@@ -836,11 +846,6 @@ export default function TradePage() {
                   </CardContent>
                 </Card>
               </div>
-              <RightColumn
-                isLoading={isLoading}
-                tradeHistory={tradeHistory}
-                formatCurrency={formatCurrency}
-              />
             </div>
           </>
         )}
