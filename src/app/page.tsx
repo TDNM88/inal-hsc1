@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import TradingViewTickerTape from "@/components/TradingViewTickerTape";
+import { Footer } from "react-day-picker";
 
 // Market ticker data
 const marketData = [
@@ -199,8 +200,8 @@ export default function Landing() {
             <iframe
               width="100%"
               height="200"
-              src="https://www.youtube.com/embed/xnCF64dVscM"
-              title="London HSC Trading Platform"
+              src="https://www.youtube.com/embed/ja3KjW4o7Zg"
+              title="Sở giao dịch chứng khoán London kỷ niệm 10 năm Wisdom Tree ở châu âu"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -496,14 +497,7 @@ export default function Landing() {
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-900">
-        <div className="container mx-auto px-4 py-12 text-center">
-          <p className="text-sm text-gray-400">
-            2025 - Bản quyền   SSI Inc. Mọi quyền được bảo lưu.
-          </p>
-        </div>
-        </div>
-      </motion.div>
+      <Footer />
     </div>
   );
 }
