@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { uploadFile } from '@/lib/fileUpload';
+import { getMongoDb } from '@/lib/db';
+import { ObjectId } from 'mongodb';
 
 // Cấu hình cho API route này để cho phép file lớn
 export const config = {
@@ -53,8 +55,46 @@ export async function POST(req: NextRequest) {
       // Upload file lên Vercel Blob
       const fileUrl = await uploadFile(file);
 
-      // TODO: Lưu thông tin file vào database nếu cần
-      // Ví dụ: lưu fileUrl và type vào user profile
+      // Lấy kết nối MongoDB
+      const db = await getMongoDb();
+      if (!db) {
+        throw new Error('Không thể kết nối đến cơ sở dữ liệu');
+      }
+
+      // Cập nhật thông tin xác minh
+      const userId = new ObjectId(user.id);
+      const updateData: any = {
+        $set: {
+          [`verification.${type === 'front' ? 'cccdFront' : 'cccdBack'}`]: fileUrl,
+          'verification.verified': false,
+          updatedAt: new Date()
+        },
+        $setOnInsert: {
+          createdAt: new Date()
+        }
+      };
+      
+      // Cập nhật hoặc tạo mới thông tin xác minh
+      const result = await db.collection('users').updateOne(
+        { _id: userId },
+        updateData,
+        { upsert: true }
+      );
+
+      if (!result.acknowledged) {
+        throw new Error('Không thể cập nhật thông tin người dùng');
+      }
+
+      // Lấy thông tin cập nhật để kiểm tra
+      const updatedUser = await db.collection('users').findOne(
+        { _id: userId },
+        { projection: { 'verification.cccdFront': 1, 'verification.cccdBack': 1 } }
+      );
+
+      // Kiểm tra nếu đã tải lên đủ 2 mặt
+      if (updatedUser?.verification?.cccdFront && updatedUser?.verification?.cccdBack) {
+        console.log(`Người dùng ${user.id} đã tải lên đủ 2 mặt CCCD`);
+      }
       
       // Trả về đường dẫn file
       return NextResponse.json({
