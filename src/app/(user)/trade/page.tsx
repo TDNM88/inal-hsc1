@@ -139,7 +139,7 @@ export default function TradePage() {
   // Hàm xử lý hành động chọn hướng giao dịch
   const handleAction = (direction: "UP" | "DOWN") => {
     setSelectedAction(direction);
-    handlePlaceOrder();
+    handlePlaceOrder(direction);
   };
 
   // Khởi tạo state
@@ -316,8 +316,9 @@ export default function TradePage() {
   }, [currentSession, futureSessions, pastSessions]);
 
   // Hàm xử lý đặt lệnh
-  const handlePlaceOrder = () => {
-    if (!selectedAction || !amount) {
+  const handlePlaceOrder = (direction?: "UP" | "DOWN") => {
+    const action = direction || selectedAction;
+    if (!action || !amount) {
       toast({
         title: 'Lỗi',
         description: 'Vui lòng chọn hướng và nhập số tiền',
@@ -335,12 +336,14 @@ export default function TradePage() {
       return;
     }
 
+    setSelectedAction(action);
     setIsConfirming(true);
   };
 
   // Xác nhận đặt lệnh
-  const confirmPlaceOrder = async () => {
-    if (!selectedAction || !amount || !token) {
+  const confirmPlaceOrder = async (direction?: "UP" | "DOWN") => {
+    const action = direction || selectedAction;
+    if (!action || !amount || !token) {
       setIsConfirming(false);
       return;
     }
@@ -356,7 +359,7 @@ export default function TradePage() {
         },
         body: JSON.stringify({
           sessionId: currentSession.sessionId,
-          direction: selectedAction,
+          direction: action,
           amount: Number(amount),
           asset: 'XAU/USD'
         })
@@ -368,6 +371,19 @@ export default function TradePage() {
 
       const result = await response.json();
 
+      // Thêm vào lịch sử giao dịch
+      setTradeHistory(prev => [
+        {
+          id: Date.now(),
+          session: parseInt(currentSession.sessionId.slice(-4)),
+          direction: action,
+          amount: Number(amount),
+          status: 'pending',
+          profit: 0
+        },
+        ...prev
+      ]);
+
       // Cập nhật số dư
       setBalance(prev => prev - Number(amount));
 
@@ -376,7 +392,7 @@ export default function TradePage() {
         {
           id: Date.now(),
           session: parseInt(currentSession.sessionId.slice(-4)),
-          direction: selectedAction,
+          direction: action,
           amount: Number(amount),
           status: 'pending',
           profit: 0
@@ -661,7 +677,8 @@ export default function TradePage() {
                   <Button
                     type="button"
                     className={`flex-1 ${selectedAction === "UP" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
-                    onClick={confirmTrade}
+                    onClick={() => selectedAction && confirmPlaceOrder(selectedAction)}
+                    disabled={!selectedAction}
                   >
                     Xác nhận
                   </Button>
@@ -678,12 +695,12 @@ export default function TradePage() {
                 />
               </div>
 
-              <div className="lg:col-span-4 space-y-6 lg:order-1 order-2">
+              <div className="lg:col-span-4 space-y-4 lg:order-1 order-2">
                 <Card className="bg-white border border-gray-300 rounded-md shadow">
                   <CardHeader>
                     <div className="flex items-center space-x-2">
                       <ChevronDown className="h-4 w-4 text-gray-700" />
-                      <CardTitle className="text-gray-900 text-base font-medium">Số dư</CardTitle>
+                      <CardTitle className="text-sm text-gray-900 font-medium">Số dư</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="py-6 px-4">

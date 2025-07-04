@@ -1,89 +1,133 @@
-"use client";
+// src/app/(auth)/login/page.tsx
+'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/useAuth';
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import { useToast } from '@/components/ui/use-toast';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const handleLogin = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
+
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+      const result = await signIn('credentials', {
+        redirect: false,
+        email,
+        password,
+        callbackUrl: searchParams.get('callbackUrl') || '/dashboard',
       });
-      const data = await response.json();
-      if (response.ok) {
-        login(data.token, data.user);
-        toast({ title: 'Đăng nhập thành công', description: 'Đang chuyển hướng...' });
-        
-        // Sử dụng router.push để điều hướng trong Next.js
-        // Nếu là admin, chuyển đến trang quản trị ẩn /dashboard-hsc thay vì /admin
-        if (data.user.role === 'admin') {
-          router.push('/dashboard-hsc');
-        } else {
-          router.push('/trade');
-        }
-      } else {
-        toast({ variant: 'destructive', title: 'Lỗi', description: data.message });
+
+      if (result?.error) {
+        throw new Error(result.error);
       }
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể đăng nhập' });
+
+      if (result?.url) {
+        toast({
+          title: 'Đăng nhập thành công',
+          description: 'Chào mừng bạn quay trở lại!',
+          variant: 'default',
+        });
+        router.push(result.url);
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast({
+        title: 'Đăng nhập thất bại',
+        description: error.message || 'Vui lòng kiểm tra lại thông tin đăng nhập',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900">
-      <Card className="w-full max-w-md bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-white text-2xl">Đăng nhập</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Đăng nhập tài khoản
+          </h2>
+        </div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm space-y-4">
             <div>
-              <Label className="text-white">Tên đăng nhập</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="bg-gray-700 text-white"
-                placeholder="Tên đăng nhập"
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1"
               />
             </div>
             <div>
-              <Label className="text-white">Mật khẩu</Label>
+              <Label htmlFor="password">Mật khẩu</Label>
               <Input
+                id="password"
+                name="password"
                 type="password"
+                autoComplete="current-password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="bg-gray-700 text-white"
-                placeholder="Mật khẩu"
+                className="mt-1"
               />
             </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="text-sm">
+              <Link
+                href="/auth/forgot-password"
+                className="font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Quên mật khẩu?
+              </Link>
+            </div>
+          </div>
+
+          <div>
             <Button
-              className="w-full bg-green-600 hover:bg-green-700"
-              onClick={handleLogin}
+              type="submit"
+              className="w-full"
               disabled={isLoading}
             >
-              {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Đăng nhập
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </form>
+
+        <div className="text-center text-sm">
+          <span className="text-gray-600">Chưa có tài khoản? </span>
+          <Link
+            href="/auth/register"
+            className="font-medium text-indigo-600 hover:text-indigo-500"
+          >
+            Đăng ký ngay
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
