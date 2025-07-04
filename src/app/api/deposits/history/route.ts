@@ -3,32 +3,35 @@ import { getMongoDb } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { verifyToken } from '@/lib/auth';
 
-// API để lấy lịch sử nạp tiền của người dùng
-export async function GET(req: NextRequest) {
+export async function GET(request: Request) {
   try {
     // Xác thực người dùng
-    const token = req.headers.get('authorization')?.split(' ')[1];
-    if (!token) {
-      return NextResponse.json({ message: 'Bạn cần đăng nhập' }, { status: 401 });
+    const { userId } = auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    const user = await verifyToken(token);
-    if (!user || !user.id) {
-      return NextResponse.json({ message: 'Token không hợp lệ' }, { status: 401 });
-    }
-
-    // Parse query params
-    const url = new URL(req.url);
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '10');
+    // Lấy tham số phân trang từ query string
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '10', 10);
     const skip = (page - 1) * limit;
 
     // Kết nối DB
     const db = await getMongoDb();
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Database connection failed' },
+        { status: 500 }
+      );
+    }
 
     // Lấy danh sách nạp tiền của người dùng
     const deposits = await db.collection('deposits')
-      .find({ user: new ObjectId(user.id) })
+      .find({ user: new ObjectId(userId) })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -36,18 +39,27 @@ export async function GET(req: NextRequest) {
 
     // Lấy tổng số bản ghi để phân trang
     const total = await db.collection('deposits')
-      .countDocuments({ user: new ObjectId(user.id) });
+      .countDocuments({ user: new ObjectId(userId) });
 
     return NextResponse.json({
-      deposits,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
+      data: deposits,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     });
 
   } catch (error) {
     console.error('Error fetching deposit history:', error);
-    return NextResponse.json({ message: 'Đã xảy ra lỗi khi lấy lịch sử nạp tiền' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
+}
+
+function auth(): { userId: any; } {
+  throw new Error('Function not implemented.');
 }
