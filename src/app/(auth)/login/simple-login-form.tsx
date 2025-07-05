@@ -33,14 +33,14 @@ export function SimpleLoginForm() {
     setIsLoading(true);
 
     try {
-      const { success, user, error } = await authenticateUser(username, password);
+      const { success, user, token, error } = await authenticateUser(username, password);
       
-      if (!success || !user) {
-        throw new Error(error || 'Đăng nhập thất bại');
+      if (!success || !user || !token) {
+        throw new Error(error || 'Đăng nhập thất bại. Vui lòng kiểm tra lại tên đăng nhập và mật khẩu.');
       }
 
       // Lưu thông tin đăng nhập vào localStorage
-      setAuthSession(user);
+      setAuthSession(user, token);
       
       // Hiển thị thông báo thành công
       toast({
@@ -50,9 +50,9 @@ export function SimpleLoginForm() {
       });
       
       // Chuyển hướng sau khi đăng nhập thành công
+      const redirectTo = user.role === 'admin' ? '/dashboard-hsc' : '/trade';
       setTimeout(() => {
-        router.push('/dashboard');
-        router.refresh();
+        window.location.href = redirectTo;
       }, 500);
     } catch (error: any) {
       console.error('Login error:', error);

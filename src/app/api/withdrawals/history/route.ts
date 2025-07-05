@@ -7,14 +7,19 @@ import { verifyToken } from '@/lib/auth';
 export async function GET(req: NextRequest) {
   try {
     // Xác thực người dùng
-    const token = req.headers.get('authorization')?.split(' ')[1];
-    if (!token) {
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
       return NextResponse.json({ message: 'Bạn cần đăng nhập' }, { status: 401 });
     }
 
-    const user = await verifyToken(token);
-    if (!user || !user.id) {
+    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
+    if (!token) {
       return NextResponse.json({ message: 'Token không hợp lệ' }, { status: 401 });
+    }
+
+    const user = await verifyToken(token);
+    if (!user?.id) {
+      return NextResponse.json({ message: 'Xác thực thất bại' }, { status: 401 });
     }
 
     // Parse query params

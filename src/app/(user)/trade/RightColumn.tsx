@@ -6,14 +6,11 @@ import TradingViewAdvancedChart from '@/components/TradingViewAdvancedChart';
 import LiquidityTable from '@/components/LiquidityTable';
 
 // Define props for the component
+import { TradeHistoryRecord } from './page';
+
 interface RightColumnProps {
   isLoading: boolean;
-  tradeHistory: {
-    session: number;
-    direction: 'UP' | 'DOWN';
-    amount: number;
-    status: 'pending' | 'win' | 'lose';
-  }[];
+  tradeHistory: TradeHistoryRecord[];
   formatCurrency: (value: number) => string;
 }
 
@@ -45,7 +42,7 @@ const RightColumn: React.FC<RightColumnProps> = ({ isLoading, tradeHistory, form
             <table className="min-w-full divide-y divide-gray-300 text-sm text-left text-gray-900">
               <thead className="bg-gray-100 uppercase text-gray-600">
                 <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">Phiên</th>
+                  <th scope="col" className="px-4 py-2 font-medium">Mã phiên</th>
                   <th scope="col" className="px-4 py-2 font-medium">Loại</th>
                   <th scope="col" className="px-4 py-2 font-medium">Số tiền</th>
                   <th scope="col" className="px-4 py-2 font-medium">Kết quả</th>
@@ -64,7 +61,7 @@ const RightColumn: React.FC<RightColumnProps> = ({ isLoading, tradeHistory, form
                 ) : (
                   tradeHistory.map((rec, idx) => (
                     <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                      <td className="px-4 py-2 whitespace-nowrap">{rec.session}</td>
+                      <td className="px-4 py-2 whitespace-nowrap">{rec.sessionId}</td>
                       <td
                         className={`px-4 py-2 font-semibold ${
                           rec.direction === 'UP' ? 'text-green-600' : 'text-red-600'
@@ -77,12 +74,12 @@ const RightColumn: React.FC<RightColumnProps> = ({ isLoading, tradeHistory, form
                         className={`px-4 py-2 font-semibold ${
                           rec.status === 'pending'
                             ? 'text-gray-500'
-                            : rec.status === 'win'
+                            : rec.result === 'win'
                             ? 'text-green-600'
                             : 'text-red-600'
                         }`}
                       >
-                        {rec.status === 'pending' ? 'Đợi kết quả' : rec.status === 'win' ? 'Thắng' : 'Thua'}
+                        {rec.status === 'pending' ? 'Đợi kết quả' : rec.result === 'win' ? 'Thắng' : 'Thua'}
                       </td>
                     </tr>
                   ))

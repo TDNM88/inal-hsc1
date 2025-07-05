@@ -1,16 +1,30 @@
 import { getMongoDb } from './db';
 import { comparePassword } from './auth';
 
-type User = {
+export type User = {
   _id: string;
   username: string;
-  role: string;
+  role: 'user' | 'admin';
   email?: string;
+  isAdmin?: boolean;
+  fullName?: string;
+  balance?: {
+    available: number;
+    frozen: number;
+  };
+  bank?: any;
 };
 
-export async function authenticateUser(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
+type AuthSession = {
+  user: User | null;
+  token: string | null;
+  role?: 'user' | 'admin';
+  isAdmin?: boolean;
+};
+
+export async function authenticateUser(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string; token?: string }> {
   try {
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch('/api/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -27,10 +41,11 @@ export async function authenticateUser(username: string, password: string): Prom
       };
     }
 
-    if (data.success && data.user) {
+    if (data.success && data.user && data.token) {
       return { 
         success: true, 
-        user: data.user 
+        user: data.user,
+        token: data.token
       };
     }
 
@@ -47,20 +62,44 @@ export async function authenticateUser(username: string, password: string): Prom
   }
 }
 
-export function setAuthSession(user: User) {
+export function setAuthSession(user: User, token: string) {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('authUser', JSON.stringify(user));
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
   }
 }
 
-export function getAuthSession(): User | null {
-  if (typeof window === 'undefined') return null;
-  const user = localStorage.getItem('authUser');
-  return user ? JSON.parse(user) : null;
+export async function getAuthSession(): Promise<AuthSession> {
+  if (typeof window === 'undefined') {
+    return { user: null, token: null };
+  }
+
+  const token = localStorage.getItem('token');
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  
+  return {
+    user,
+    token,
+    role: user?.role || 'user',
+    isAdmin: user?.role === 'admin'
+  };
 }
 
-export function clearAuthSession() {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('authUser');
+export async function clearAuthSession() {
+  if (typeof window === 'undefined') return;
+  
+  // Clear client-side storage
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  
+  // Clear HTTP-only cookie via API
+  try {
+    await fetch('/api/logout', {
+      method: 'POST',
+      credentials: 'same-origin'
+    });
+  } catch (error) {
+    console.error('Error during logout:', error);
   }
 }
