@@ -1,8 +1,22 @@
-import React from 'react';
-import Link from 'next/link';
+'use client';
+
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function NotFound() {
+  const router = useRouter();
+  
+  useEffect(() => {
+    // Optional: Redirect to home after 5 seconds
+    const timer = setTimeout(() => {
+      router.push('/');
+    }, 5000);
+    
+    return () => clearTimeout(timer);
+  }, [router]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
       <div className="max-w-md w-full space-y-6 text-center">
@@ -12,11 +26,14 @@ export default function NotFound() {
           <p className="text-gray-600 dark:text-gray-400">
             The page you're looking for doesn't exist or has been moved.
           </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+            Redirecting to home page in 5 seconds...
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button asChild>
             <Link href="/">
-              Go to Home
+              Go to Home Now
             </Link>
           </Button>
           <Button variant="outline" asChild>
