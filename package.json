@@ -11,7 +11,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@auth/core": "^0.40.0",
     "@emotion/is-prop-valid": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
@@ -43,7 +42,6 @@
     "@radix-ui/react-tooltip": "1.1.6",
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/next-auth": "^3.13.0",
     "@vercel/blob": "^1.1.1",
     "autoprefixer": "^10.4.20",
     "aws4": "^1.13.2",

@@ -1,19 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getAuthSession } from '@/lib/simple-auth';
+import { getAuthSession } from './simple-auth';
 
 // Danh sách các route yêu cầu đăng nhập
-const protectedRoutes = ['/dashboard', '/admin', '/dashboard-hsc'];
+const protectedRoutes = ['/dashboard', '/admin'];
 const publicRoutes = ['/login', '/register', '/forgot-password'];
 
-export async function middleware(request: NextRequest) {
+export function authMiddleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const user = getAuthSession();
-
-  // Bỏ qua các route API
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next();
-  }
 
   // Nếu người dùng đã đăng nhập và cố gắng truy cập trang đăng nhập/đăng ký
   if (user && publicRoutes.some(route => pathname.startsWith(route))) {
@@ -28,19 +23,5 @@ export async function middleware(request: NextRequest) {
     ));
   }
 
-  // Rewrite /dashboard-hsc đến /admin
-  if (pathname.startsWith('/dashboard-hsc')) {
-    const newPath = pathname.replace('/dashboard-hsc', '/admin');
-    const url = new URL(newPath, request.url);
-    url.search = request.nextUrl.search;
-    return NextResponse.rewrite(url);
-  }
-
   return NextResponse.next();
 }
-
-export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|logo.png).*)',
-  ],
-};

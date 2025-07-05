@@ -71,7 +71,8 @@ export async function hashPassword(password: string): Promise<string> {
 /**
  * So sánh mật khẩu với mật khẩu đã mã hóa
  */
-export async function comparePassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
+export async function comparePassword(plainPassword: string, hashedPassword: string | null | undefined): Promise<boolean> {
+  if (!hashedPassword) return false;
   try {
     return await bcrypt.compare(plainPassword, hashedPassword);
   } catch (error) {
