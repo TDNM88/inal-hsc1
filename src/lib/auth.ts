@@ -23,3 +23,44 @@ export function parseToken(token: string): { userId: string; timestamp: number }
   }
   return null
 }
+
+export async function verifyToken(token: string): Promise<{ userId: string; isValid: boolean }> {
+  try {
+    const parsed = parseToken(token);
+    if (!parsed) {
+      return { userId: '', isValid: false };
+    }
+    
+    // Check if token is expired (24 hours)
+    const tokenAge = Date.now() - parsed.timestamp;
+    const isExpired = tokenAge > 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    
+    return {
+      userId: parsed.userId,
+      isValid: !isExpired
+    };
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    return { userId: '', isValid: false };
+  }
+}
+
+export async function getUserFromRequest(req: Request): Promise<{ userId: string | null; isAuthenticated: boolean }> {
+  try {
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return { userId: null, isAuthenticated: false };
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { userId, isValid } = await verifyToken(token);
+    
+    return {
+      userId: isValid ? userId : null,
+      isAuthenticated: isValid
+    };
+  } catch (error) {
+    console.error('Error getting user from request:', error);
+    return { userId: null, isAuthenticated: false };
+  }
+}
