@@ -1,25 +1,29 @@
-import type { ReactNode } from "react"
+import type React from "react"
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
 import "./globals.css"
+import { AuthProvider } from "@/lib/useAuth"
+import { Toaster } from "@/components/ui/toaster"
 
-export const metadata = {
-  title: "London SSI",
-  description: "Nền tảng giao dịch ngoại hối và đầu tư tài chính hàng đầu tại châu Âu",
+const inter = Inter({ subsets: ["latin"] })
+
+export const metadata: Metadata = {
+  title: "Trading Platform",
+  description: "Nền tảng giao dịch trực tuyến",
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="vi" translate="no">
-      <head>
-        <meta charSet="UTF-8" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
-        <meta name="viewport"
-          content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no;user-scalable=0;" />
-        <title>London SSI</title>
-      </head>
-      <body className="flex flex-col min-h-screen">
-        <div id="root" className="flex-1">
+    <html lang="vi">
+      <body className={inter.className}>
+        <AuthProvider>
           {children}
-        </div>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   )

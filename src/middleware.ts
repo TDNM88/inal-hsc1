@@ -1,64 +1,57 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { getAuthSession } from '@/lib/simple-auth';
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-// Protected routes
-const protectedRoutes = ['/trade', '/account', '/deposit', '/withdraw', '/orders'];
-const adminRoutes = ['/dashboard-hsc', '/admin'];
-const authRoutes = ['/login', '/register'];
-const publicRoutes = ['/'];
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get("token")?.value
+  const { pathname } = request.nextUrl
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  
-  // Bỏ qua các route API và file tĩnh
-  if (pathname.startsWith('/api/') || 
-      pathname.match(/\.(.*)$/) || 
-      pathname.startsWith('/_next/') || 
-      pathname === '/favicon.ico' ||
-      pathname.includes('.')) { // Bỏ qua tất cả các file có đuôi
-    return NextResponse.next();
+  // Public routes that don't require authentication
+  const publicRoutes = ["/", "/login", "/register"]
+
+  // API routes that should be handled separately
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next()
   }
 
-  const session = await getAuthSession();
-  const user = session?.user || null;
-  const isAdmin = session?.isAdmin || false;
-  
-  // Log để debug
-  console.log('Middleware - Path:', pathname, 'User:', user ? 'Logged in' : 'Not logged in');
-  const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
-  const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route));
-  const isPublicRoute = publicRoutes.includes(pathname) || pathname === '';
-  
-  // Nếu đang ở trang đăng nhập/đăng ký và đã đăng nhập
-  if (user && isAuthRoute) {
-    // Admin sẽ được chuyển đến dashboard
-    if (isAdmin) {
-      return NextResponse.redirect(new URL('/dashboard-hsc', request.url));
-    }
-    // Người dùng thường sẽ được chuyển đến trang trade
-    return NextResponse.redirect(new URL('/trade', request.url));
-  }
-  
-  // Nếu chưa đăng nhập và truy cập vào trang cần xác thực
-  if (!user && (isProtectedRoute || isAdminRoute)) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-  
-  // Người dùng thường không thể truy cập trang admin
-  if (user && isAdminRoute && !isAdmin) {
-    return NextResponse.redirect(new URL('/trade', request.url));
+  // Static files and Next.js internals
+  if (
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/favicon.ico") ||
+    pathname.startsWith("/images/") ||
+    pathname.startsWith("/icons/")
+  ) {
+    return NextResponse.next()
   }
 
-  // Tiếp tục xử lý request nếu không có chuyển hướng nào được thực hiện
-  return NextResponse.next();
+  // Check if current path is public
+  const isPublicRoute = publicRoutes.includes(pathname)
+
+  // If no token and trying to access protected route
+  if (!token && !isPublicRoute) {
+    const loginUrl = new URL("/login", request.url)
+    loginUrl.searchParams.set("callbackUrl", pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // If has token but trying to access auth pages, redirect based on role
+  if (token && (pathname === "/login" || pathname === "/register")) {
+    // We can't easily decode the token here, so redirect to home
+    // The client-side auth will handle proper redirection
+    return NextResponse.redirect(new URL("/", request.url))
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|logo.png|api/auth/).*)',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
-};
+}

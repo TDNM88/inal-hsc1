@@ -2,18 +2,25 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { clearAuthSession } from '@/lib/simple-auth';
+import { useAuth } from '@/lib/useAuth';
 
 export default function LogoutPage() {
   const router = useRouter();
+  const { logout } = useAuth();
 
   useEffect(() => {
-    // Xóa thông tin đăng nhập
-    clearAuthSession();
-    
-    // Chuyển hướng về trang đăng nhập
-    router.push('/login');
-  }, [router]);
+    const performLogout = async () => {
+      try {
+        await logout();
+        // Redirect sẽ được xử lý bởi hàm logout trong useAuth
+      } catch (error) {
+        console.error('Logout error:', error);
+        router.push('/login');
+      }
+    };
+
+    performLogout();
+  }, [logout, router]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">

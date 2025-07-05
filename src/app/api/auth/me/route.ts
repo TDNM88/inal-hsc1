@@ -1,107 +1,72 @@
-import { NextResponse } from 'next/server';
-import { getMongoDb } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
-import { ObjectId } from 'mongodb';
-
-interface UserData {
-  _id: ObjectId;
-  username: string;
-  email: string;
-  role?: string;
-  fullName?: string;
-  balance?: { available: number; frozen: number };
-  bank?: any;
-}
+import { NextResponse } from "next/server"
+import { getMongoDb } from "@/lib/db"
+import { parseToken } from "@/lib/auth"
+import { ObjectId } from "mongodb"
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json(
-        { success: false, message: 'No token provided' },
-        { status: 401 }
-      );
+    // Get token from cookie
+    const cookies = request.headers.get("cookie") || ""
+    const tokenMatch = cookies.match(/token=([^;]+)/)
+
+    if (!tokenMatch) {
+      return NextResponse.json({ success: false, message: "Chưa đăng nhập" }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: 'No token provided' },
-        { status: 401 }
-      );
+    const token = tokenMatch[1]
+    const tokenData = parseToken(token)
+
+    if (!tokenData) {
+      return NextResponse.json({ success: false, message: "Token không hợp lệ" }, { status: 401 })
     }
 
-    // Verify the token and get user ID
-    const decoded = verifyToken(token);
-    if (!decoded || typeof decoded !== 'object' || !('id' in decoded)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid or expired token' },
-        { status: 401 }
-      );
-    }
+    // Check token expiry (7 days)
+    const now = Date.now()
+    const tokenAge = now - tokenData.timestamp
+    const maxAge = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
 
-    const userId = (decoded as { id: string }).id;
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid user ID in token' },
-        { status: 401 }
-      );
+    if (tokenAge > maxAge) {
+      return NextResponse.json({ success: false, message: "Token đã hết hạn" }, { status: 401 })
     }
 
     // Get user from database
-    const db = await getMongoDb();
+    const db = await getMongoDb()
     if (!db) {
-      return NextResponse.json(
-        { success: false, message: 'Database connection error' },
-        { status: 500 }
-      );
+      throw new Error("Không thể kết nối cơ sở dữ liệu")
     }
 
-    let user: UserData | null;
-    try {
-      user = await db.collection<UserData>('users').findOne(
-        { _id: new ObjectId(userId) },
-        { projection: { password: 0 } } // Exclude password
-      ) as UserData | null;
-    } catch (error) {
-      console.error('Database error:', error);
-      return NextResponse.json(
-        { success: false, message: 'Error fetching user data' },
-        { status: 500 }
-      );
-    }
+    const user = await db.collection("users").findOne(
+      { _id: new ObjectId(tokenData.userId) },
+      { projection: { password: 0 } }, // Don't return password
+    )
 
     if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'User not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, message: "Người dùng không tồn tại" }, { status: 404 })
     }
 
+    // Check if user is still active
+    if (!user.status?.active) {
+      return NextResponse.json({ success: false, message: "Tài khoản đã bị khóa" }, { status: 401 })
+    }
 
-
-    // Return user data without sensitive information
-    const userData = {
+    const userResponse = {
       id: user._id.toString(),
       username: user.username,
-      email: user.email,
-      role: user.role || 'user',
-      isAdmin: user.role === 'admin',
-      fullName: user.fullName || '',
+      role: user.role || "user",
       balance: user.balance || { available: 0, frozen: 0 },
-      bank: user.bank || null
-    };
+      bank: user.bank || { name: "", accountNumber: "", accountHolder: "" },
+      verification: user.verification || { verified: false, cccdFront: "", cccdBack: "" },
+      status: user.status || { active: true, betLocked: false, withdrawLocked: false },
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
+    }
 
     return NextResponse.json({
       success: true,
-      user: userData
-    });
-
+      user: userResponse,
+    })
   } catch (error) {
-    console.error('Auth me error:', error);
-    return NextResponse.json(
-      { success: false, message: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error("Auth me error:", error)
+    return NextResponse.json({ success: false, message: "Lỗi hệ thống" }, { status: 500 })
   }
 }
