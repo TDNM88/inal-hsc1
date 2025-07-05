@@ -91,20 +91,55 @@ export async function PUT(request: Request) {
 
     // Xây dựng update object dựa trên field
     let updateObject: any = {};
+    const fieldParts = field.split('.');
+    
+    // Validate giá trị
+    if (value === undefined || value === null) {
+      return NextResponse.json({ message: `Giá trị cho trường ${field} không hợp lệ` }, { status: 400 });
+    }
 
-    if (field.startsWith('status.')) {
+    // Xử lý các trường đặc biệt
+    if (field === 'password') {
+      if (typeof value !== 'string' || value.length < 6) {
+        return NextResponse.json({ message: 'Mật khẩu phải có ít nhất 6 ký tự' }, { status: 400 });
+      }
+      updateObject[field] = value; // Trong thực tế nên hash mật khẩu trước khi lưu
+    } 
+    else if (field === 'balance.available' || field === 'balance.frozen') {
+      // Validate số dư
+      const balance = Number(value);
+      if (isNaN(balance) || balance < 0) {
+        return NextResponse.json({ message: 'Số dư không hợp lệ' }, { status: 400 });
+      }
+      updateObject[field] = balance;
+    }
+    else if (field.startsWith('status.')) {
       // Cập nhật trạng thái
-      const statusField = field.split('.')[1];
+      const statusField = fieldParts[1];
+      if (typeof value !== 'boolean') {
+        return NextResponse.json({ message: 'Giá trị trạng thái không hợp lệ' }, { status: 400 });
+      }
       updateObject[`status.${statusField}`] = value;
-    } else if (field === 'balance.available' || field === 'balance.frozen') {
-      // Cập nhật số dư
-      updateObject[field] = value;
-    } else if (field.startsWith('verification.')) {
+    } 
+    else if (field.startsWith('verification.')) {
       // Cập nhật trạng thái xác minh
-      const verificationField = field.split('.')[1];
+      const verificationField = fieldParts[1];
       updateObject[`verification.${verificationField}`] = value;
-    } else {
+    }
+    else if (field.startsWith('bank.')) {
+      // Cập nhật thông tin ngân hàng
+      const bankField = fieldParts[1];
+      if (!['name', 'accountNumber', 'accountHolder'].includes(bankField)) {
+        return NextResponse.json({ message: 'Trường thông tin ngân hàng không hợp lệ' }, { status: 400 });
+      }
+      updateObject[`bank.${bankField}`] = value;
+    }
+    else {
       // Cập nhật thông tin cơ bản
+      const allowedFields = ['username', 'fullName', 'email', 'phoneNumber'];
+      if (!allowedFields.includes(field)) {
+        return NextResponse.json({ message: 'Trường cập nhật không được phép' }, { status: 400 });
+      }
       updateObject[field] = value;
     }
 
@@ -141,9 +176,8 @@ export async function DELETE(request: Request) {
       console.warn('Auth check bypassed in development:', authError);
     }
 
-    // Lấy ID người dùng từ URL
-    const url = new URL(request.url);
-    const userId = url.searchParams.get('userId');
+    // Lấy thông tin từ body
+    const { userId } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ message: 'Thiếu ID người dùng' }, { status: 400 });

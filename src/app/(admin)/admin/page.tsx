@@ -205,19 +205,24 @@ function CustomersPage({ token }: any) {
 
   const toggleCustomerStatus = async (customerId: string, field: string, currentValue: boolean) => {
     try {
-      const res = await fetch(`/api/admin/users/${customerId}/status`, {
+      const res = await fetch(`/api/admin/users`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ [field]: !currentValue }),
+        body: JSON.stringify({ 
+          userId: customerId,
+          field: `status.${field}`,
+          value: !currentValue 
+        }),
       });
       const result = await res.json();
       if (res.ok) {
         toast({ title: 'Thành công', description: `Đã cập nhật trạng thái ${field}` });
         mutate();
       } else {
-        toast({ variant: 'destructive', title: 'Lỗi', description: result.message });
+        toast({ variant: 'destructive', title: 'Lỗi', description: result.message || 'Có lỗi xảy ra' });
       }
     } catch (err) {
+      console.error('Error updating status:', err);
       toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể cập nhật trạng thái' });
     }
   };
@@ -225,56 +230,111 @@ function CustomersPage({ token }: any) {
   const handleEditCustomer = (customer: any) => {
     setEditingCustomer(customer);
     setEditForm({
-      username: customer.username,
+      username: customer?.username || '',
       password: '',
-      balance: customer.balance.available,
-      frozenBalance: customer.balance.frozen,
-      fullName: customer.fullName,
-      bankName: customer.bank?.name || '',
-      accountNumber: customer.bank?.accountNumber || '',
-      accountHolder: customer.bank?.accountHolder || '',
+      balance: customer?.balance?.available || 0,
+      frozenBalance: customer?.balance?.frozen || 0,
+      fullName: customer?.fullName || '',
+      bankName: customer?.bank?.name || '',
+      accountNumber: customer?.bank?.accountNumber || '',
+      accountHolder: customer?.bank?.accountHolder || '',
     });
     setShowEditModal(true);
   };
 
   const handleSaveCustomer = async () => {
+    if (!editingCustomer) return;
+    
     try {
-      const res = await fetch(`/api/admin/users/${editingCustomer._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(editForm),
-      });
-      const result = await res.json();
-      if (res.ok) {
-        toast({ title: 'Thành công', description: 'Đã cập nhật thông tin khách hàng' });
-        mutate();
-        setShowEditModal(false);
-        setEditingCustomer(null);
-      } else {
-        toast({ variant: 'destructive', title: 'Lỗi', description: result.message });
+      const updates = [
+        { field: 'fullName', value: editForm.fullName },
+        { field: 'balance.available', value: Number(editForm.balance) },
+        { field: 'balance.frozen', value: Number(editForm.frozenBalance) },
+      ];
+
+      // Chỉ cập nhật mật khẩu nếu có nhập
+      if (editForm.password) {
+        updates.push({ field: 'password', value: editForm.password });
       }
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể cập nhật khách hàng' });
+
+      // Cập nhật thông tin ngân hàng
+      // Nếu có ít nhất một trường thông tin ngân hàng được nhập
+      if (editForm.bankName || editForm.accountNumber || editForm.accountHolder) {
+        if (editForm.bankName) {
+          updates.push({ field: 'bank.name', value: editForm.bankName });
+        }
+        if (editForm.accountNumber) {
+          updates.push({ field: 'bank.accountNumber', value: editForm.accountNumber });
+        }
+        if (editForm.accountHolder) {
+          updates.push({ field: 'bank.accountHolder', value: editForm.accountHolder });
+        }
+      }
+
+      // Send updates one by one
+      let success = true;
+      for (const update of updates) {
+        const res = await fetch('/api/admin/users', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            userId: editingCustomer._id,
+            field: update.field,
+            value: update.value
+          }),
+        });
+        
+        if (!res.ok) {
+          const result = await res.json();
+          throw new Error(result.message || 'Có lỗi xảy ra khi cập nhật thông tin');
+        }
+      }
+
+      toast({ title: 'Thành công', description: 'Đã cập nhật thông tin khách hàng' });
+      mutate();
+      setShowEditModal(false);
+      setEditingCustomer(null);
+    } catch (error: any) {
+      console.error('Error updating customer:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Lỗi', 
+        description: error.message || 'Không thể cập nhật thông tin khách hàng' 
+      });
     }
   };
 
   const handleDeleteCustomer = async (customerId: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa khách hàng này?')) {
-      try {
-        const res = await fetch(`/api/admin/users/${customerId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
+    if (!confirm('Bạn có chắc chắn muốn xóa khách hàng này?')) return;
+    
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ userId: customerId })
+      });
+      
+      const result = await res.json();
+      
+      if (res.ok) {
+        toast({ 
+          title: 'Thành công', 
+          description: result.message || 'Đã xóa khách hàng' 
         });
-        const result = await res.json();
-        if (res.ok) {
-          toast({ title: 'Thành công', description: 'Đã xóa khách hàng' });
-          mutate();
-        } else {
-          toast({ variant: 'destructive', title: 'Lỗi', description: result.message });
-        }
-      } catch (err) {
-        toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể xóa khách hàng' });
+        mutate();
+      } else {
+        throw new Error(result.message || 'Có lỗi xảy ra khi xóa khách hàng');
       }
+    } catch (error: any) {
+      console.error('Error deleting customer:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Lỗi', 
+        description: error.message || 'Không thể xóa khách hàng' 
+      });
     }
   };
 
@@ -334,21 +394,27 @@ function CustomersPage({ token }: any) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers.map((customer: any) => (
-                  <TableRow key={customer._id}>
-                    <TableCell className="text-teal-400 font-medium">{customer.username}</TableCell>
-                    <TableCell>
-                      <div className="text-sm text-white">
-                        <div>Số dư: <span className="font-semibold">{customer.balance.available.toLocaleString()}</span></div>
-                        <div>Số dư đông băng: <span className="font-semibold">{customer.balance.frozen.toLocaleString()}</span></div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-white">{customer.loginInfo}</TableCell>
+                {customers && Array.isArray(customers) && customers.map((customer: any) => {
+                  // Ensure customer object and its properties exist
+                  const status = customer?.status || { active: false, betLocked: false, withdrawLocked: false };
+                  const verification = customer?.verification || { cccdFront: false, cccdBack: false, verified: false };
+                  const balance = customer?.balance || { available: 0, frozen: 0 };
+                  
+                  return (
+                    <TableRow key={customer?._id || Math.random().toString(36).substr(2, 9)}>
+                      <TableCell className="text-teal-400 font-medium">{customer?.username || 'N/A'}</TableCell>
+                      <TableCell>
+                        <div className="text-sm text-white">
+                          <div>Số dư: <span className="font-semibold">{(balance?.available || 0).toLocaleString()}</span></div>
+                          <div>Số dư đông băng: <span className="font-semibold">{(balance?.frozen || 0).toLocaleString()}</span></div>
+                        </div>
+                      </TableCell>
+                    <TableCell className="text-white">{customer?.loginInfo || 'N/A'}</TableCell>
                     <TableCell>
                       <div className="space-y-1 text-sm text-white">
-                        <div>{customer.fullName}</div>
-                        <div>CCCD mặt trước: {customer.verification?.cccdFront ? 'Có' : 'Không'}</div>
-                        <div>CCCD mặt sau: {customer.verification?.cccdBack ? 'Có' : 'Không'}</div>
+                        <div>{customer?.fullName || 'Chưa cập nhật'}</div>
+                        <div>CCCD mặt trước: {verification?.cccdFront ? 'Có' : 'Không'}</div>
+                        <div>CCCD mặt sau: {verification?.cccdBack ? 'Có' : 'Không'}</div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -356,49 +422,49 @@ function CustomersPage({ token }: any) {
                         <div className="flex items-center gap-2">
                           <span>Trạng thái:</span>
                           <button
-                            onClick={() => toggleCustomerStatus(customer._id, 'active', customer.status.active)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${customer.status.active ? 'bg-green-500' : 'bg-gray-300'}`}
+                            onClick={() => toggleCustomerStatus(customer?._id || '', 'active', status.active)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${status.active ? 'bg-green-500' : 'bg-gray-300'}`}
                           >
-                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${customer.status.active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${status.active ? 'translate-x-4' : 'translate-x-0.5'}`} />
                           </button>
-                          <span className={`ml-2 text-xs ${customer.status.active ? 'text-green-600' : 'text-gray-500'}`}>
-                            {customer.status.active ? 'Hoạt động' : 'Không hoạt động'}
+                          <span className={`ml-2 text-xs ${status.active ? 'text-green-600' : 'text-gray-500'}`}>
+                            {status.active ? 'Hoạt động' : 'Không hoạt động'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span>Xác minh:</span>
                           <button
-                            onClick={() => toggleCustomerStatus(customer._id, 'verified', customer.verification.verified)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${customer.verification.verified ? 'bg-green-500' : 'bg-gray-300'}`}
+                            onClick={() => toggleCustomerStatus(customer?._id || '', 'verified', verification.verified)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${verification.verified ? 'bg-green-500' : 'bg-gray-300'}`}
                           >
-                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${customer.verification.verified ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${verification.verified ? 'translate-x-4' : 'translate-x-0.5'}`} />
                           </button>
-                          <span className={`ml-2 text-xs ${customer.verification.verified ? 'text-green-600' : 'text-gray-500'}`}>
-                            {customer.verification.verified ? 'Đã xác minh' : 'Chưa xác minh'}
+                          <span className={`ml-2 text-xs ${verification.verified ? 'text-green-600' : 'text-gray-500'}`}>
+                            {verification.verified ? 'Đã xác minh' : 'Chưa xác minh'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span>Khóa cược:</span>
                           <button
-                            onClick={() => toggleCustomerStatus(customer._id, 'betLocked', customer.status.betLocked)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${customer.status.betLocked ? 'bg-red-500' : 'bg-gray-300'}`}
+                            onClick={() => toggleCustomerStatus(customer?._id || '', 'betLocked', status.betLocked)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${status.betLocked ? 'bg-red-500' : 'bg-gray-300'}`}
                           >
-                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${customer.status.betLocked ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${status.betLocked ? 'translate-x-4' : 'translate-x-0.5'}`} />
                           </button>
-                          <span className={`ml-2 text-xs ${customer.status.betLocked ? 'text-red-600' : 'text-gray-500'}`}>
-                            {customer.status.betLocked ? 'Có' : 'Không'}
+                          <span className={`ml-2 text-xs ${status.betLocked ? 'text-red-600' : 'text-gray-500'}`}>
+                            {status.betLocked ? 'Có' : 'Không'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span>Khóa rút:</span>
                           <button
-                            onClick={() => toggleCustomerStatus(customer._id, 'withdrawLocked', customer.status.withdrawLocked)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${customer.status.withdrawLocked ? 'bg-red-500' : 'bg-gray-300'}`}
+                            onClick={() => toggleCustomerStatus(customer?._id || '', 'withdrawLocked', status.withdrawLocked)}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${status.withdrawLocked ? 'bg-red-500' : 'bg-gray-300'}`}
                           >
-                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${customer.status.withdrawLocked ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${status.withdrawLocked ? 'translate-x-4' : 'translate-x-0.5'}`} />
                           </button>
-                          <span className={`ml-2 text-xs ${customer.status.withdrawLocked ? 'text-red-600' : 'text-gray-500'}`}>
-                            {customer.status.withdrawLocked ? 'Có' : 'Không'}
+                          <span className={`ml-2 text-xs ${status.withdrawLocked ? 'text-red-600' : 'text-gray-500'}`}>
+                            {status.withdrawLocked ? 'Có' : 'Không'}
                           </span>
                         </div>
                       </div>

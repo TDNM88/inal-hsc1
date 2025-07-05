@@ -20,33 +20,59 @@ export function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate input
+    if (!email || !password) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng điền đầy đủ email và mật khẩu',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const result = await signIn('credentials', {
         redirect: false,
-        email,
-        password,
-        callbackUrl: searchParams.get('callbackUrl') || '/dashboard',
+        email: email.trim(),
+        password: password.trim(),
+        callbackUrl: searchParams?.get('callbackUrl') || '/dashboard',
       });
 
       if (result?.error) {
-        throw new Error(result.error);
+        // Handle specific error messages
+        let errorMessage = 'Đăng nhập thất bại. Vui lòng thử lại.';
+        
+        if (result.error.includes('CredentialsSignin')) {
+          errorMessage = 'Email hoặc mật khẩu không chính xác';
+        } else if (result.error.includes('AccountNotActive')) {
+          errorMessage = 'Tài khoản của bạn chưa được kích hoạt';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       if (result?.url) {
+        // Show success message before redirect
         toast({
           title: 'Đăng nhập thành công',
-          description: 'Chào mừng bạn quay trở lại!',
+          description: 'Đang chuyển hướng...',
           variant: 'default',
         });
-        router.push(result.url);
+        
+        // Small delay to show success message
+        const redirectUrl = result.url || '/dashboard';
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 500);
       }
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
-        title: 'Đăng nhập thất bại',
-        description: error.message || 'Vui lòng kiểm tra lại thông tin đăng nhập',
+        title: 'Lỗi đăng nhập',
+        description: error.message || 'Đã xảy ra lỗi khi đăng nhập',
         variant: 'destructive',
       });
     } finally {
