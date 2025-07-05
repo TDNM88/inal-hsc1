@@ -3,15 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { Loader2, Home, Users, History, TrendingUp, ArrowUpCircle, ArrowDownCircle, Settings, Bell, HelpCircle, Edit, Trash2, ChevronLeft, ChevronRight, Upload, FileText, CheckCircle, XCircle, Clock, Eye, User, RefreshCw, AlertCircle } from 'lucide-react';
+import { 
+  Loader2, Home, Users, History, TrendingUp, ArrowUpCircle, ArrowDownCircle, Settings, Bell, HelpCircle, Edit, Trash2, ChevronLeft, ChevronRight, Upload, FileText, CheckCircle, XCircle, Clock, Eye, User, RefreshCw, AlertCircle,
+  CreditCard, LogOut, Search, MoreVertical, Check, X
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { VerificationImageModal } from '@/components/admin/VerificationImageModal';
 import useSWR from 'swr';
@@ -394,88 +397,40 @@ function CustomersPage({ token }: any) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers && Array.isArray(customers) && customers.map((customer: any) => {
-                  // Ensure customer object and its properties exist
-                  const status = customer?.status || { active: false, betLocked: false, withdrawLocked: false };
-                  const verification = customer?.verification || { cccdFront: false, cccdBack: false, verified: false };
-                  const balance = customer?.balance || { available: 0, frozen: 0 };
-                  
-                  return (
-                    <TableRow key={customer?._id || Math.random().toString(36).substr(2, 9)}>
-                      <TableCell className="text-teal-400 font-medium">{customer?.username || 'N/A'}</TableCell>
-                      <TableCell>
-                        <div className="text-sm text-white">
-                          <div>Số dư: <span className="font-semibold">{(balance?.available || 0).toLocaleString()}</span></div>
-                          <div>Số dư đông băng: <span className="font-semibold">{(balance?.frozen || 0).toLocaleString()}</span></div>
-                        </div>
-                      </TableCell>
-                    <TableCell className="text-white">{customer?.loginInfo || 'N/A'}</TableCell>
+                {Array.isArray(customers) && customers.map((customer) => (
+                  <TableRow key={customer._id}>
+                    <TableCell>{customer.username}</TableCell>
+                    <TableCell>{(customer.balance?.available || 0).toLocaleString()} VNĐ</TableCell>
+                    <TableCell>{customer.lastLoginIp || 'N/A'}</TableCell>
                     <TableCell>
-                      <div className="space-y-1 text-sm text-white">
-                        <div>{customer?.fullName || 'Chưa cập nhật'}</div>
-                        <div>CCCD mặt trước: {verification?.cccdFront ? 'Có' : 'Không'}</div>
-                        <div>CCCD mặt sau: {verification?.cccdBack ? 'Có' : 'Không'}</div>
-                      </div>
+                      {customer.verification?.verified ? (
+                        <Badge variant="success">Đã xác minh</Badge>
+                      ) : (
+                        <Badge variant="destructive">Chưa xác minh</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span>Trạng thái:</span>
-                          <button
-                            onClick={() => toggleCustomerStatus(customer?._id || '', 'active', status.active)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${status.active ? 'bg-green-500' : 'bg-gray-300'}`}
-                          >
-                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${status.active ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                          </button>
-                          <span className={`ml-2 text-xs ${status.active ? 'text-green-600' : 'text-gray-500'}`}>
-                            {status.active ? 'Hoạt động' : 'Không hoạt động'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>Xác minh:</span>
-                          <button
-                            onClick={() => toggleCustomerStatus(customer?._id || '', 'verified', verification.verified)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${verification.verified ? 'bg-green-500' : 'bg-gray-300'}`}
-                          >
-                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${verification.verified ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                          </button>
-                          <span className={`ml-2 text-xs ${verification.verified ? 'text-green-600' : 'text-gray-500'}`}>
-                            {verification.verified ? 'Đã xác minh' : 'Chưa xác minh'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>Khóa cược:</span>
-                          <button
-                            onClick={() => toggleCustomerStatus(customer?._id || '', 'betLocked', status.betLocked)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${status.betLocked ? 'bg-red-500' : 'bg-gray-300'}`}
-                          >
-                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${status.betLocked ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                          </button>
-                          <span className={`ml-2 text-xs ${status.betLocked ? 'text-red-600' : 'text-gray-500'}`}>
-                            {status.betLocked ? 'Có' : 'Không'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>Khóa rút:</span>
-                          <button
-                            onClick={() => toggleCustomerStatus(customer?._id || '', 'withdrawLocked', status.withdrawLocked)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${status.withdrawLocked ? 'bg-red-500' : 'bg-gray-300'}`}
-                          >
-                            <div className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${status.withdrawLocked ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                          </button>
-                          <span className={`ml-2 text-xs ${status.withdrawLocked ? 'text-red-600' : 'text-gray-500'}`}>
-                            {status.withdrawLocked ? 'Có' : 'Không'}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${customer.status?.active ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <span>{customer.status?.active ? 'Hoạt động' : 'Khóa'}</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="p-1 bg-transparent hover:bg-blue-800" onClick={() => handleEditCustomer(customer)}>
-                          <Edit className="h-4 w-4 text-blue-600" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditCustomer(customer)}
+                        >
+                          <Edit className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="outline" className="p-1 bg-transparent hover:bg-red-800" onClick={() => handleDeleteCustomer(customer._id)}>
-                          <Trash2 className="h-4 w-4 text-red-600" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteCustomer(customer._id)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -486,113 +441,120 @@ function CustomersPage({ token }: any) {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Customer Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-800 text-white">
+        <DialogContent className="bg-gray-800 text-white border-gray-700">
           <DialogHeader>
-            <DialogTitle>Update thông tin</DialogTitle>
+            <DialogTitle>Chỉnh sửa thông tin khách hàng</DialogTitle>
+            <DialogDescription>
+              Cập nhật thông tin tài khoản khách hàng
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label>Tên đăng nhập</Label>
-                <Input value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} className="bg-gray-700 text-white" />
-              </div>
-              <div>
-                <Label>Mật khẩu</Label>
-                <Input
-                  type="password"
-                  placeholder="Mật khẩu"
-                  value={editForm.password}
-                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                  className="bg-gray-700 text-white"
-                />
-              </div>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="username" className="text-right">
+                Tên đăng nhập
+              </Label>
+              <Input
+                id="username"
+                value={editForm.username}
+                onChange={(e) => setEditForm({...editForm, username: e.target.value})}
+                className="col-span-3"
+                disabled
+              />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label>Số dư</Label>
-                <Input
-                  type="number"
-                  value={editForm.balance}
-                  onChange={(e) => setEditForm({ ...editForm, balance: Number(e.target.value) })}
-                  className="bg-gray-700 text-white"
-                />
-              </div>
-              <div>
-                <Label>Số dư đông băng</Label>
-                <Input
-                  type="number"
-                  value={editForm.frozenBalance}
-                  onChange={(e) => setEditForm({ ...editForm, frozenBalance: Number(e.target.value) })}
-                  className="bg-gray-700 text-white"
-                />
-              </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="password" className="text-right">
+                Mật khẩu mới
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={editForm.password}
+                onChange={(e) => setEditForm({...editForm, password: e.target.value})}
+                className="col-span-3"
+                placeholder="Để trống nếu không đổi mật khẩu"
+              />
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-center mb-4">Thông tin xác minh danh tính</h3>
-              <div className="mb-4">
-                <Label>Họ tên</Label>
-                <Input
-                  placeholder="Họ tên"
-                  value={editForm.fullName}
-                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-                  className="bg-gray-700 text-white"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label>CCCD mặt trước</Label>
-                  <Button variant="outline" className="w-full mt-2 bg-transparent text-white border-gray-600">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Tải lên
-                  </Button>
-                </div>
-                <div>
-                  <Label>CCCD mặt sau</Label>
-                  <Button variant="outline" className="w-full mt-2 bg-transparent text-white border-gray-600">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Tải lên
-                  </Button>
-                </div>
-              </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="balance" className="text-right">
+                Số dư khả dụng
+              </Label>
+              <Input
+                id="balance"
+                type="number"
+                value={editForm.balance}
+                onChange={(e) => setEditForm({...editForm, balance: Number(e.target.value)})}
+                className="col-span-3"
+              />
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-center mb-4">Thông tin ngân hàng</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <Label>Tên ngân hàng</Label>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="frozenBalance" className="text-right">
+                Số dư đóng băng
+              </Label>
+              <Input
+                id="frozenBalance"
+                type="number"
+                value={editForm.frozenBalance}
+                onChange={(e) => setEditForm({...editForm, frozenBalance: Number(e.target.value)})}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="fullName" className="text-right">
+                Họ và tên
+              </Label>
+              <Input
+                id="fullName"
+                value={editForm.fullName}
+                onChange={(e) => setEditForm({...editForm, fullName: e.target.value})}
+                className="col-span-3"
+              />
+            </div>
+            <div className="border-t border-gray-700 my-4 pt-4">
+              <h4 className="text-sm font-medium mb-4">Thông tin ngân hàng</h4>
+              <div className="grid gap-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="bankName" className="text-right">
+                    Ngân hàng
+                  </Label>
                   <Input
-                    placeholder="Tên ngân hàng"
+                    id="bankName"
                     value={editForm.bankName}
-                    onChange={(e) => setEditForm({ ...editForm, bankName: e.target.value })}
-                    className="bg-gray-700 text-white"
+                    onChange={(e) => setEditForm({...editForm, bankName: e.target.value})}
+                    className="col-span-3"
                   />
                 </div>
-                <div>
-                  <Label>Số tài khoản</Label>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="accountNumber" className="text-right">
+                    Số tài khoản
+                  </Label>
                   <Input
-                    placeholder="Số tài khoản"
+                    id="accountNumber"
                     value={editForm.accountNumber}
-                    onChange={(e) => setEditForm({ ...editForm, accountNumber: e.target.value })}
-                    className="bg-gray-700 text-white"
+                    onChange={(e) => setEditForm({...editForm, accountNumber: e.target.value})}
+                    className="col-span-3"
                   />
                 </div>
-                <div>
-                  <Label>Chủ tài khoản</Label>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="accountHolder" className="text-right">
+                    Chủ tài khoản
+                  </Label>
                   <Input
-                    placeholder="Chủ tài khoản"
+                    id="accountHolder"
                     value={editForm.accountHolder}
-                    onChange={(e) => setEditForm({ ...editForm, accountHolder: e.target.value })}
-                    className="bg-gray-700 text-white"
+                    onChange={(e) => setEditForm({...editForm, accountHolder: e.target.value})}
+                    className="col-span-3"
                   />
                 </div>
               </div>
-            </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowEditModal(false)} className="text-white border-gray-600 w-full sm:w-auto">Đóng</Button>
-              <Button className="bg-green-600 hover:bg-green-700 w-full sm:w-auto" onClick={handleSaveCustomer}>Lưu</Button>
             </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>Hủy</Button>
+            <Button onClick={handleSaveCustomer}>Lưu thay đổi</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -613,22 +575,37 @@ function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate, tok
 
   const deposits = data?.deposits || [];
 
-  const updateDepositStatus = async (depositId: string, status: 'Đã duyệt' | 'Từ chối') => {
+  const updateDepositStatus = async (depositId: string, status: string) => {
     try {
-      const res = await fetch(`/api/deposits/${depositId}`, {
+      const res = await fetch(`/api/admin/deposits/${depositId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
       });
-      const result = await res.json();
-      if (res.ok) {
-        toast({ title: 'Thành công', description: `Yêu cầu nạp tiền đã được ${status}` });
-        mutate();
-      } else {
-        toast({ variant: 'destructive', title: 'Lỗi', description: result.message });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to update deposit status');
       }
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể cập nhật trạng thái' });
+      
+      // Refresh the deposits list
+      mutate();
+      
+      toast({
+        title: 'Thành công',
+        description: `Đã cập nhật trạng thái yêu cầu nạp tiền thành ${status}`,
+      });
+      
+    } catch (error: any) {
+      console.error('Error updating deposit status:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: error.message || 'Có lỗi xảy ra khi cập nhật trạng thái',
+      });
     }
   };
 
@@ -739,7 +716,7 @@ function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate, tok
 }
 
 // Order History Page Component
-function OrderHistoryPage({ startDate, setStartDate, endDate, setEndDate, token }: any) {
+function OrderHistoryPage({ startDate, setStartDate, endDate, setEndDate, token }: any): React.JSX.Element {
   const [customerFilter, setCustomerFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 

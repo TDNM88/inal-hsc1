@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 
 export function LoginForm() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -22,10 +22,10 @@ export function LoginForm() {
     e.preventDefault();
     
     // Validate input
-    if (!email || !password) {
+    if (!username || !password) {
       toast({
         title: 'Lỗi',
-        description: 'Vui lòng điền đầy đủ email và mật khẩu',
+        description: 'Vui lòng điền đầy đủ tên đăng nhập và mật khẩu',
         variant: 'destructive',
       });
       return;
@@ -36,7 +36,7 @@ export function LoginForm() {
     try {
       const result = await signIn('credentials', {
         redirect: false,
-        email: email.trim(),
+        username: username.trim(),
         password: password.trim(),
         callbackUrl: searchParams?.get('callbackUrl') || '/dashboard',
       });
@@ -91,16 +91,18 @@ export function LoginForm() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Tên đăng nhập</Label>
               <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Tên đăng nhập"
+                disabled={isLoading}
               />
             </div>
             <div>
@@ -118,15 +120,10 @@ export function LoginForm() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <Link
-                href="/auth/forgot-password"
-                className="font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                Quên mật khẩu?
-              </Link>
-            </div>
+          <div className="flex items-center justify-end">
+            <Link href="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-500">
+              Quên mật khẩu?
+            </Link>
           </div>
 
           <div>
