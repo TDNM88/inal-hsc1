@@ -95,7 +95,7 @@ export default function TradePage() {
     return `${year}${month}${day}${hours}${minutes}`;
   }, []);
 
-  // Hàm tạo thời gian bắt đầu và kết thúc của phiên
+  // Hàm tạo thởi gian bắt đầu và kết thúc của phiên
   const getSessionTimeRange = useCallback((time: Date) => {
     // Đảm bảo time là một đối tượng Date hợp lệ
     if (!(time instanceof Date) || isNaN(time.getTime())) {
@@ -458,7 +458,7 @@ export default function TradePage() {
   useEffect(() => {
     if (!token) return;
 
-    // Hàm cập nhật đồng hồ đếm ngược dựa trên thời gian client
+    // Hàm cập nhật đồng hồ đếm ngược dựa trên thởi gian client
     const updateCountdown = () => {
       const now = new Date();
       setCurrentTime(now);
@@ -598,6 +598,91 @@ export default function TradePage() {
     confirmPlaceOrder();
   }
 
+  const handleConfirmOrder = async (action: "UP" | "DOWN") => {
+    if (!token || !currentSession) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng đăng nhập và thử lại',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast({
+        title: 'Lỗi',
+        description: 'Vui lòng nhập số tiền hợp lệ',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          sessionId: currentSession.sessionId,
+          direction: action,
+          amount: Number(amount),
+          asset: 'XAU/USD'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Đã xảy ra lỗi khi đặt lệnh');
+      }
+
+      const orderData = await response.json();
+
+      // Cập nhật lịch sử giao dịch
+      setTradeHistory(prev => [
+        {
+          id: Date.now(),
+          session: parseInt(currentSession.sessionId.slice(-4)),
+          direction: action,
+          amount: Number(amount),
+          status: 'pending',
+          profit: 0
+        },
+        ...prev
+      ]);
+
+      // Cập nhật số dư tài khoản
+      setBalance(prev => prev - Number(amount));
+
+      // Hiển thị thông báo thành công
+      toast({
+        title: 'Thành công',
+        description: `Đã đặt lệnh ${action === 'UP' ? 'TĂNG' : 'GIẢM'} thành công`,
+        variant: 'default'
+      });
+
+      // Đóng hộp thoại xác nhận
+      setIsConfirming(false);
+      setAmount('');
+      setSelectedAction(null);
+
+    } catch (error: any) {
+      console.error('Lỗi khi đặt lệnh:', error);
+      setError(error.message || 'Đã xảy ra lỗi khi đặt lệnh');
+      toast({
+        title: 'Lỗi',
+        description: error.message || 'Đã xảy ra lỗi khi đặt lệnh',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
       <div className="p-4 md:p-8">
@@ -677,7 +762,7 @@ export default function TradePage() {
                   <Button
                     type="button"
                     className={`flex-1 ${selectedAction === "UP" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
-                    onClick={() => selectedAction && confirmPlaceOrder(selectedAction)}
+                    onClick={() => selectedAction && handleConfirmOrder(selectedAction)}
                     disabled={!selectedAction}
                   >
                     Xác nhận
