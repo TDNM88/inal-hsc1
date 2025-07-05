@@ -43,15 +43,10 @@ export function LoginForm() {
       });
 
       if (result?.error) {
-        // Handle specific error messages
-        let errorMessage = 'Đăng nhập thất bại. Vui lòng thử lại.';
-        
-        if (result.error.includes('CredentialsSignin')) {
-          errorMessage = 'Tên đăng nhập hoặc mật khẩu không chính xác';
-        } else if (result.error.includes('AccountNotActive')) {
-          errorMessage = 'Tài khoản của bạn chưa được kích hoạt';
-        }
-        
+        // Parse error message from URL if available
+        const errorMessage = new URLSearchParams(result.error).get('error') || 
+          'Tên đăng nhập hoặc mật khẩu không chính xác';
+
         throw new Error(errorMessage);
       }
 
@@ -67,6 +62,7 @@ export function LoginForm() {
         const redirectUrl = result.url || '/dashboard';
         setTimeout(() => {
           router.push(redirectUrl);
+          router.refresh();
         }, 500);
       }
     } catch (error: any) {
