@@ -34,7 +34,7 @@ function setCorsHeaders(response: NextResponse, origin: string) {
 }
 
 // Hàm lấy token từ request
-function getTokenFromRequest(request: NextRequest): string | null {
+function getTokenFromRequest(request: NextRequest): { token: string | null; source: string } {
   console.log('Getting token from request...');
   
   // 1. Ưu tiên lấy từ header Authorization
@@ -42,7 +42,7 @@ function getTokenFromRequest(request: NextRequest): string | null {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     console.log('Got token from Authorization header');
-    return token;
+    return { token, source: 'header' };
   }
   
   // 2. Thử lấy từ cookie
@@ -57,22 +57,20 @@ function getTokenFromRequest(request: NextRequest): string | null {
     const token = cookies['token'];
     if (token) {
       console.log('Got token from cookie');
-      return token;
+      return { token, source: 'cookie' };
     }
   }
   
-  // 3. Thử lấy từ localStorage (cho client-side rendering)
-  // Lưu ý: Middleware chạy trên server nên không thể truy cập trực tiếp localStorage
-  // Nhưng có thể kiểm tra xem có token trong URL không (cho trường hợp redirect từ OAuth)
+  // 3. Thử lấy từ URL (cho trường hợp redirect từ OAuth hoặc email)
   const url = new URL(request.url);
   const tokenFromUrl = url.searchParams.get('token');
   if (tokenFromUrl) {
     console.log('Got token from URL');
-    return tokenFromUrl;
+    return { token: tokenFromUrl, source: 'url' };
   }
   
   console.log('No token found in request');
-  return null;
+  return { token: null, source: 'none' };
 }
 
 export async function middleware(request: NextRequest) {
@@ -123,31 +121,74 @@ export async function middleware(request: NextRequest) {
   }
   
   // Lấy token từ request
-  const token = getTokenFromRequest(request);
-  console.log('Token in middleware:', token ? 'Token exists' : 'No token');
+  const { token, source } = getTokenFromRequest(request);
+  console.log(`Token in middleware: ${token ? `Found in ${source}` : 'Not found'}`);
   
   // Kiểm tra token
   if (!token) {
     console.log('No token found in request');
-    return NextResponse.redirect(new URL('/login', request.url));
+    
+    // Nếu là API request, trả về lỗi 401 thay vì redirect
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ success: false, message: 'Unauthorized' }), 
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Redirect về trang đăng nhập cho các request thông thường
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('from', pathname);
+    return NextResponse.redirect(loginUrl);
   }
   
-  // Kiểm tra token hợp lệ
-  const { isValid } = await verifyToken(token);
-  if (!isValid) {
-    console.log('Invalid or expired token');
+  try {
+    // Kiểm tra token hợp lệ
+    const { isValid, userId } = await verifyToken(token);
     
-    // Xóa cookie token nếu không hợp lệ
-    response.cookies.delete('token');
+    if (!isValid || !userId) {
+      console.log('Invalid or expired token');
+      
+      // Xóa cookie token nếu không hợp lệ
+      response.cookies.delete('token');
+      
+      // Nếu là API request, trả về lỗi 401
+      if (pathname.startsWith('/api/')) {
+        return new NextResponse(
+          JSON.stringify({ success: false, message: 'Token không hợp lệ hoặc đã hết hạn' }), 
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Redirect về trang đăng nhập cho các request thông thường
+      return NextResponse.redirect(new URL('/login', request.url), {
+        headers: response.headers
+      });
+    }
     
-    return NextResponse.redirect(new URL('/login', request.url), {
-      headers: response.headers
-    });
+    // Thêm thông tin user vào headers cho các API request
+    if (pathname.startsWith('/api/')) {
+      request.headers.set('x-user-id', userId);
+    }
+    
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    
+    // Nếu có lỗi khi xác thực token, trả về lỗi 500
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ success: false, message: 'Lỗi khi xác thực' }), 
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Xử lý preflight request (OPTIONS) đã được xử lý ở trên
+  // Xử lý preflight request (OPTIONS)
   if (request.method === 'OPTIONS') {
-    return response;
+    const response = new NextResponse(null, { status: 204 });
+    return setCorsHeaders(response, origin);
   }
 
   // Chặn request từ origin không được phép

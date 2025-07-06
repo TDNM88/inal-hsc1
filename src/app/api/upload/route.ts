@@ -21,15 +21,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Bạn cần đăng nhập' }, { status: 401 });
     }
 
-    const user = await verifyToken(token);
-    if (!user || !user.id) {
+    const authResult = await verifyToken(token);
+    if (!authResult.isValid || !authResult.userId) {
       return NextResponse.json({ message: 'Token không hợp lệ' }, { status: 401 });
     }
 
     // Xử lý form data
     const formData = await req.formData();
-    const file = formData.get('document') as File;
-    const type = formData.get('type') as string;
+    let file = formData.get('file') as File;
+    
+    // Nếu không có file từ trường 'file', thử lấy từ trường 'document' (tương thích ngược)
+    if (!file) {
+      const altFile = formData.get('document') as File;
+      if (altFile) {
+        file = altFile;
+      }
+    }
+    
+    // Nếu vẫn không có file, trả về lỗi
+    if (!file) {
+      return NextResponse.json({ message: 'Không tìm thấy file' }, { status: 400 });
+    }
+    
+    // Mặc định type là 'bill' nếu không có
+    const type = (formData.get('type') as string) || 'bill';
 
     if (!file) {
       return NextResponse.json({ message: 'Không tìm thấy file' }, { status: 400 });
@@ -62,7 +77,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Cập nhật thông tin xác minh
-      const userId = new ObjectId(user.id);
+      const userIdObj = new ObjectId(authResult.userId);
       const updateData: any = {
         $set: {
           [`verification.${type === 'front' ? 'cccdFront' : 'cccdBack'}`]: fileUrl,
@@ -76,7 +91,7 @@ export async function POST(req: NextRequest) {
       
       // Cập nhật hoặc tạo mới thông tin xác minh
       const result = await db.collection('users').updateOne(
-        { _id: userId },
+        { _id: userIdObj },
         updateData,
         { upsert: true }
       );
@@ -87,13 +102,13 @@ export async function POST(req: NextRequest) {
 
       // Lấy thông tin cập nhật để kiểm tra
       const updatedUser = await db.collection('users').findOne(
-        { _id: userId },
+        { _id: userIdObj },
         { projection: { 'verification.cccdFront': 1, 'verification.cccdBack': 1 } }
       );
 
       // Kiểm tra nếu đã tải lên đủ 2 mặt
       if (updatedUser?.verification?.cccdFront && updatedUser?.verification?.cccdBack) {
-        console.log(`Người dùng ${user.id} đã tải lên đủ 2 mặt CCCD`);
+        console.log(`Người dùng ${authResult.userId} đã tải lên đủ 2 mặt CCCD`);
       }
       
       // Trả về đường dẫn file
