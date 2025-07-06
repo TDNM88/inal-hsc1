@@ -22,11 +22,20 @@ export const metadata: Metadata = {
 
 import ClientLayout from './ClientLayout';
 
+// This is the root layout - required for all pages
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Don't render html/body here for admin routes
+  if (process.env.NEXT_PHASE !== 'phase-production-build' && 
+      typeof window !== 'undefined' && 
+      window.location.pathname.startsWith('/admin')) {
+    return <>{children}</>;
+  }
+
+  // For all other routes, use the default layout
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

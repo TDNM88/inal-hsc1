@@ -1,12 +1,29 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSWRConfig } from 'swr';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { Loader2, Home, TrendingUp, Bell, HelpCircle, ChevronLeft, ChevronRight, Table as TableIcon, Badge as BadgeIcon, Trash2, Edit } from 'lucide-react';
+import { 
+  Loader2, 
+  Home, 
+  TrendingUp, 
+  Bell, 
+  HelpCircle, 
+  ChevronLeft, 
+  ChevronRight, 
+  Table as TableIcon, 
+  Badge as BadgeIcon, 
+  Trash2, 
+  Edit,
+  Users,
+  Download,
+  Upload,
+  History,
+  Settings
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { TradingSessionsPage } from '@/components/admin/TradingSessionsPage';
 import { Input } from 'components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from 'components/ui/table';
@@ -17,31 +34,117 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from 'c
 import { Badge } from 'components/ui/badge';
 import UserMenu from '@/components/user-menu';
 
-type PageType = 'dashboard' | 'trading-sessions';
+type PageType = 'dashboard' | 'trading-sessions' | 'customers' | 'deposit-requests' | 'withdraw-requests' | 'order-history' | 'settings';
 
 const menuItems = [
-  { id: 'dashboard' as PageType, title: 'Dashboard', icon: Home },
-  { id: 'trading-sessions' as PageType, title: 'Phiên giao dịch', icon: TrendingUp },
+  { id: 'dashboard' as PageType, title: 'Tổng quan', icon: Home },
+  { id: 'trading-sessions' as PageType, title: 'Quản lý phiên giao dịch', icon: TrendingUp },
+  { id: 'customers' as PageType, title: 'Quản lý người dùng', icon: Users },
+  { id: 'deposit-requests' as PageType, title: 'Yêu cầu nạp tiền', icon: Download },
+  { id: 'withdraw-requests' as PageType, title: 'Yêu cầu rút tiền', icon: Upload },
+  { id: 'order-history' as PageType, title: 'Lịch sử giao dịch', icon: History },
+  { id: 'settings' as PageType, title: 'Cài đặt', icon: Settings },
 ];
 
-const fetcher = (url: string, token: string) =>
-  fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json());
+// Fetcher function for SWR
+const fetcher = async (url: string, token?: string) => {
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers
+    });
+    
+    if (!response.ok) {
+      const error = new Error('An error occurred while fetching the data.');
+      (error as any).status = response.status;
+      throw error;
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('Fetcher error:', error);
+    throw error;
+  }
+};
 
 // Dashboard Page Component
-function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: any) {
+function DashboardPage({ startDate, setStartDate, endDate, setEndDate }: any) {
   const { toast } = useToast();
-  const { data: statsData, isLoading: statsLoading } = useSWR(
-    token ? `/api/admin/stats?startDate=${startDate}&endDate=${endDate}` : null,
-    url => fetcher(url, token),
+  const auth = useAuth();
+  const isAuthenticated = auth.isAuthenticated();
+  const isAdmin = auth.isAdmin();
+  const { data: statsData, isLoading: statsLoading, error: statsError } = useSWR(
+    isAuthenticated ? `/api/admin/stats?startDate=${startDate || ''}&endDate=${endDate || ''}` : null,
+    url => fetch(url, { credentials: 'include' }).then(res => res.json()),
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+      onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+        // Only retry up to 3 times
+        if (retryCount >= 3) return;
+        // Retry after 5 seconds
+        setTimeout(() => revalidate({ retryCount }), 5000);
+      },
+    }
   );
-  const { data: ordersData, isLoading: ordersLoading } = useSWR(
-    token ? `/api/admin/orders?startDate=${startDate}&endDate=${endDate}&limit=8` : null,
-    url => fetcher(url, token),
+  
+  useEffect(() => {
+    if (statsError) {
+      console.error('Error fetching stats:', statsError);
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể tải thống kê. Vui lòng thử lại sau.',
+        variant: 'destructive',
+      });
+    }
+  }, [statsError, toast]);
+  const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useSWR(
+    isAuthenticated ? `/api/admin/orders?startDate=${startDate || ''}&endDate=${endDate || ''}&limit=8` : null,
+    url => fetch(url, { credentials: 'include' }).then(res => res.json()),
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+    }
   );
-  const { data: usersData, isLoading: usersLoading } = useSWR(
-    token ? `/api/admin/users?startDate=${startDate}&endDate=${endDate}&limit=10` : null,
-    url => fetcher(url, token),
+  
+  const { data: usersData, isLoading: usersLoading, error: usersError } = useSWR(
+    isAuthenticated ? `/api/admin/users?startDate=${startDate || ''}&endDate=${endDate || ''}&limit=10` : null,
+    url => fetch(url, { credentials: 'include' }).then(res => res.json()),
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+    }
   );
+  
+  useEffect(() => {
+    if (ordersError) {
+      console.error('Error fetching orders:', ordersError);
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể tải danh sách đơn hàng. Vui lòng thử lại sau.',
+        variant: 'destructive',
+      });
+    }
+  }, [ordersError, toast]);
+  
+  useEffect(() => {
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể tải danh sách người dùng. Vui lòng thử lại sau.',
+        variant: 'destructive',
+      });
+    }
+  }, [usersError, toast]);
 
   const stats = statsData || { newUsers: 131, totalDeposits: 10498420000, totalWithdrawals: 6980829240, totalUsers: 5600000 };
   const orders = ordersData?.orders || [];
@@ -78,7 +181,9 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: 
             <CardTitle className="text-sm font-medium text-gray-400">Tổng tiền nạp</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-green-600">{statsLoading ? '...' : stats.totalDeposits.toLocaleString()} đ</div>
+            <div className="text-xl font-bold text-green-600">
+              {statsLoading ? '...' : (stats.totalDeposits || 0).toLocaleString()} đ
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-gray-800 border-gray-700">
@@ -86,7 +191,9 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: 
             <CardTitle className="text-sm font-medium text-gray-400">Tổng tiền rút</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-red-600">{statsLoading ? '...' : stats.totalWithdrawals.toLocaleString()}</div>
+            <div className="text-xl font-bold text-red-600">
+              {statsLoading ? '...' : (stats.totalWithdrawals || 0).toLocaleString()} đ
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-gray-800 border-gray-700">
@@ -178,30 +285,112 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, token }: 
 }
 
 // Customers Page Component
-function CustomersPage({ token }: any) {
-  const { toast } = useToast();
+const CustomersPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [users, setUsers] = useState<any[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [isFreezeModalOpen, setIsFreezeModalOpen] = useState(false);
+  const [isUnfreezeModalOpen, setIsUnfreezeModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isLoadingAction, setIsLoadingAction] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [userForm, setUserForm] = useState({
+    username: '',
+    email: '',
+    phone: '',
+    balance: '',
+    role: 'user',
+    status: 'active',
+    password: '',
+    confirmPassword: ''
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [isLoadingAddUser, setIsLoadingAddUser] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+  interface EditFormData {
+    username: string;
+    email: string;
+    phone: string;
+    balance: string | number;
+    role: string;
+    status: string;
+    password: string;
+    confirmPassword: string;
+    frozenBalance: number | string;
+    fullName: string;
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+  }
+
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({
-    username: '', password: '', balance: 0, frozenBalance: 0, fullName: '',
-    bankName: '', accountNumber: '', accountHolder: '',
+  const [editForm, setEditForm] = useState<EditFormData>({
+    username: '',
+    email: '',
+    phone: '',
+    balance: '',
+    role: 'user',
+    status: 'active',
+    password: '',
+    confirmPassword: '',
+    frozenBalance: 0,
+    fullName: '',
+    bankName: '',
+    accountNumber: '',
+    accountHolder: ''
   });
 
-  const { data, isLoading, mutate } = useSWR(
-    token ? `/api/admin/users?search=${searchTerm}&status=${statusFilter}` : null,
-    url => fetcher(url, token),
-    { refreshInterval: 5000 }
-  );
+  // SWR mutation for data refetching
+  const { mutate } = useSWRConfig();
 
-  const customers = data?.users || [];
+  const fetchUsers = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(
+        `/api/admin/users?page=${currentPage}&search=${encodeURIComponent(searchTerm)}`, 
+        {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      
+      const data = await response.json();
+      setUsers(data.users);
+      setTotalUsers(data.total);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Không thể tải danh sách người dùng. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [currentPage, searchTerm]);
 
+  const { toast } = useToast();
   const toggleCustomerStatus = async (customerId: string, field: string, currentValue: boolean) => {
     try {
       const res = await fetch(`/api/admin/users`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId: customerId,
           field: `status.${field}`,
@@ -211,7 +400,7 @@ function CustomersPage({ token }: any) {
       const result = await res.json();
       if (res.ok) {
         toast({ title: 'Thành công', description: `Đã cập nhật trạng thái ${field}` });
-        mutate();
+        fetchUsers();
       } else {
         toast({ variant: 'destructive', title: 'Lỗi', description: result.message || 'Có lỗi xảy ra' });
       }
@@ -223,16 +412,22 @@ function CustomersPage({ token }: any) {
 
   const handleEditCustomer = (customer: any) => {
     setEditingCustomer(customer);
-    setEditForm({
+    setEditForm(prev => ({
+      ...prev, // Keep all existing values
       username: customer?.username || '',
+      email: customer?.email || '',
+      phone: customer?.phone || '',
+      role: customer?.role || 'user',
+      status: customer?.status || 'active',
       password: '',
-      balance: customer?.balance?.available || 0,
-      frozenBalance: customer?.balance?.frozen || 0,
+      confirmPassword: '',
+      balance: customer?.balance?.available?.toString() || '0',
+      frozenBalance: customer?.balance?.frozen?.toString() || '0',
       fullName: customer?.fullName || '',
       bankName: customer?.bank?.name || '',
       accountNumber: customer?.bank?.accountNumber || '',
-      accountHolder: customer?.bank?.accountHolder || '',
-    });
+      accountHolder: customer?.bank?.accountHolder || ''
+    }));
     setShowEditModal(true);
   };
 
@@ -270,7 +465,7 @@ function CustomersPage({ token }: any) {
       for (const update of updates) {
         const res = await fetch('/api/admin/users', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: editingCustomer._id,
             field: update.field,
@@ -285,7 +480,7 @@ function CustomersPage({ token }: any) {
       }
 
       toast({ title: 'Thành công', description: 'Đã cập nhật thông tin khách hàng' });
-      mutate();
+      mutate(`/api/admin/users?page=${currentPage}&search=${encodeURIComponent(searchTerm)}`);
       setShowEditModal(false);
       setEditingCustomer(null);
     } catch (error: any) {
@@ -305,8 +500,7 @@ function CustomersPage({ token }: any) {
       const res = await fetch('/api/admin/users', {
         method: 'DELETE',
         headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ userId: customerId })
       });
@@ -318,7 +512,7 @@ function CustomersPage({ token }: any) {
           title: 'Thành công', 
           description: result.message || 'Đã xóa khách hàng' 
         });
-        mutate();
+        mutate(`/api/admin/users?page=${currentPage}&search=${encodeURIComponent(searchTerm)}`);
       } else {
         throw new Error(result.message || 'Có lỗi xảy ra khi xóa khách hàng');
       }
@@ -331,6 +525,7 @@ function CustomersPage({ token }: any) {
       });
     }
   };
+
 
   return (
     <div className="space-y-6">
@@ -388,13 +583,13 @@ function CustomersPage({ token }: any) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Array.isArray(customers) && customers.map((customer) => (
-                  <TableRow key={customer._id}>
-                    <TableCell>{customer.username}</TableCell>
-                    <TableCell>{(customer.balance?.available || 0).toLocaleString()} VNĐ</TableCell>
-                    <TableCell>{customer.lastLoginIp || 'N/A'}</TableCell>
+                {Array.isArray(users) && users.map((user) => (
+                  <TableRow key={user._id}>
+                    <TableCell>{user.username}</TableCell>
+                    <TableCell>{(user.balance?.available || 0).toLocaleString()} VNĐ</TableCell>
+                    <TableCell>{user.lastLoginIp || 'N/A'}</TableCell>
                     <TableCell>
-                      {customer.verification?.verified ? (
+                      {user.verification?.verified ? (
                         <Badge variant="default">Đã xác minh</Badge>
                       ) : (
                         <Badge variant="destructive">Chưa xác minh</Badge>
@@ -402,8 +597,8 @@ function CustomersPage({ token }: any) {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${customer.status?.active ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        <span>{customer.status?.active ? 'Hoạt động' : 'Khóa'}</span>
+                        <div className={`w-2 h-2 rounded-full ${user.status?.active ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <span>{user.status?.active ? 'Hoạt động' : 'Khóa'}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -411,14 +606,14 @@ function CustomersPage({ token }: any) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleEditCustomer(customer)}
+                          onClick={() => handleEditCustomer(user)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteCustomer(customer._id)}
+                          onClick={() => handleDeleteCustomer(user._id)}
                           className="text-red-500 hover:text-red-600"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -553,15 +748,14 @@ function CustomersPage({ token }: any) {
 }
 
 // Deposit Requests Page Component
-function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate, token }: any) {
+function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate }: any) {
   const { toast } = useToast();
   const [customerFilter, setCustomerFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
   const { data, isLoading, mutate } = useSWR(
-    token ? `/api/deposits?customer=${customerFilter}&status=${statusFilter}&startDate=${startDate}&endDate=${endDate}` : null,
-    url => fetcher(url, token),
-    { refreshInterval: 5000 }
+    `/api/deposits?customer=${customerFilter}&status=${statusFilter}&startDate=${startDate}&endDate=${endDate}`,
+    fetcher
   );
 
   const deposits = data?.deposits || [];
@@ -570,9 +764,9 @@ function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate, tok
     try {
       const res = await fetch(`/api/admin/deposits/${depositId}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status })
       });
@@ -707,13 +901,20 @@ function DepositRequestsPage({ startDate, setStartDate, endDate, setEndDate, tok
 }
 
 // Order History Page Component
-function OrderHistoryPage({ startDate, setStartDate, endDate, setEndDate, token }: any): React.JSX.Element {
+const OrderHistoryPage = ({ startDate, setStartDate, endDate, setEndDate }: {
+  startDate: string;
+  setStartDate: (date: string) => void;
+  endDate: string;
+  setEndDate: (date: string) => void;
+}): React.JSX.Element => {
   const [customerFilter, setCustomerFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const auth = useAuth();
+  const isAuthenticated = auth && typeof auth.isAuthenticated === 'function' && auth.isAuthenticated();
 
   const { data, isLoading } = useSWR(
-    token ? `/api/admin/orders?customer=${customerFilter}&status=${statusFilter}&startDate=${startDate}&endDate=${endDate}` : null,
-    url => fetcher(url, token),
+    isAuthenticated ? `/api/admin/orders?customer=${customerFilter}&status=${statusFilter}&startDate=${startDate}&endDate=${endDate}` : null,
+    fetcher,
     { refreshInterval: 5000 }
   );
 
@@ -800,20 +1001,8 @@ function OrderHistoryPage({ startDate, setStartDate, endDate, setEndDate, token 
   );
 }
 
-// Trading Sessions Page Wrapper Component
-function TradingSessionsPageWrapper({ token }: { token: string | null }) {
-  if (!token) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <p>Vui lòng đăng nhập để xem trang này</p>
-      </div>
-    );
-  }
-  
-  return <TradingSessionsPage token={token} />;
-}
-
 // Main Admin Dashboard Component
+import { TradingSessionsPage } from '@/components/admin/TradingSessionsPage';
 export default function AdminDashboard() {
   const router = useRouter();
   const { user, isAdmin, isAuthenticated, isLoading, logout } = useAuth();
@@ -823,33 +1012,34 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   
-  // Get token from localStorage for API calls
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
   // Redirect to login if not authenticated or not admin
   useEffect(() => {
-    if (!isLoading && !isAuthenticated()) {
-      toast({
-        variant: 'destructive',
-        title: 'Lỗi',
-        description: 'Vui lòng đăng nhập để truy cập trang quản trị'
-      });
-      router.push('/login');
-      return;
-    }
+    if (!isLoading) {
+      if (!isAuthenticated()) {
+        console.log('User not authenticated, redirecting to login...');
+        toast({
+          variant: 'destructive',
+          title: 'Lỗi',
+          description: 'Vui lòng đăng nhập để truy cập trang quản trị'
+        });
+        router.push('/login');
+        return;
+      }
 
-    if (!isLoading && isAuthenticated() && !isAdmin()) {
-      toast({
-        variant: 'destructive',
-        title: 'Lỗi',
-        description: 'Bạn không có quyền truy cập trang này'
-      });
-      router.push('/');
+      if (isAuthenticated() && !isAdmin()) {
+        console.log('User is not admin, redirecting to home...');
+        toast({
+          variant: 'destructive',
+          title: 'Lỗi',
+          description: 'Bạn không có quyền truy cập trang này'
+        });
+        router.push('/');
+      }
     }
   }, [user, isLoading, isAuthenticated, isAdmin, router, toast]);
 
   // Show loading state
-  if (isLoading || !token) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-900">
         <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
@@ -862,10 +1052,44 @@ export default function AdminDashboard() {
     return null;
   }
 
+  // Don't render anything if not authenticated or not admin
+  if (!isAuthenticated() || !isAdmin() || !user) {
+    return null;
+  }
+
+  // Render the active page
+  const renderActivePage = () => {
+    const commonProps = {
+      startDate,
+      setStartDate,
+      endDate,
+      setEndDate
+    };
+
+    switch (activePage) {
+      case 'dashboard':
+        return <DashboardPage {...commonProps} />;
+      case 'trading-sessions':
+        return <TradingSessionsPage />;
+      case 'customers':
+        return <CustomersPage />;
+      case 'deposit-requests':
+        return <DepositRequestsPage {...commonProps} />;
+      case 'withdraw-requests':
+        return <div>Quản lý rút tiền</div>;
+      case 'order-history':
+        return <OrderHistoryPage {...commonProps} />;
+      case 'settings':
+        return <div>Cài đặt</div>;
+      default:
+        return <DashboardPage {...commonProps} />;
+    }
+  };
+
   return (
-    <div className="flex flex-col sm:flex-row min-h-screen bg-gray-900 text-white">
+    <div className="flex flex-1 flex-col sm:flex-row min-h-screen bg-background text-foreground">
       {/* Sidebar */}
-      <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 border-r border-gray-700 flex flex-col justify-between sm:sticky top-0`}>
+      <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 border-r flex flex-col justify-between sm:sticky top-0 bg-card`}>
         <div>
           <div className="flex items-center justify-between p-2 sm:p-4">
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="sm:hidden">
@@ -909,13 +1133,16 @@ export default function AdminDashboard() {
           </div>
           <UserMenu user={user} logout={logout} />
         </header>
-        <main className="flex-1 p-2 sm:p-6 overflow-auto">
-          {activePage === 'dashboard' && (
-            <div className="flex items-center justify-center h-full">
-              <p>Trang tổng quan đang được phát triển</p>
+        <main className="flex-1 p-4 sm:p-6 overflow-auto bg-gray-50 dark:bg-gray-900">
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              {menuItems.find(item => item.id === activePage)?.title}
+            </h1>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              {renderActivePage()}
             </div>
-          )}
-          {activePage === 'trading-sessions' && <TradingSessionsPageWrapper token={token} />}
+          </div>
         </main>
       </div>
     </div>

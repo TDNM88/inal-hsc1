@@ -17,10 +17,12 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <ProtectedRoute requiredRole="admin">
-      <html lang="vi">
-        <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>{children}</body>
-      </html>
-    </ProtectedRoute>
+    <html lang="vi" suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans antialiased">
+        <ProtectedRoute requiredRole="admin">
+          {children}
+        </ProtectedRoute>
+      </body>
+    </html>
   )
 }

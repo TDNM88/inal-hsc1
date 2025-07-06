@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/useAuth';
 import { generateSessionId, parseSessionId } from '@/lib/sessionUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,8 +23,29 @@ type Session = {
   updatedAt?: string;
 };
 
-export function TradingSessionsPage({ token }: { token: string }) {
+export function TradingSessionsPage() {
+  const { isAuthenticated, isAdmin } = useAuth();
   const { toast } = useToast();
+  
+  // Ensure user is authenticated and is admin
+  const router = useRouter();
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      toast({
+        title: 'Lỗi xác thực',
+        description: 'Vui lòng đăng nhập để truy cập trang này',
+        variant: 'destructive',
+      });
+      router.push('/login');
+    } else if (!isAdmin()) {
+      toast({
+        title: 'Lỗi phân quyền',
+        description: 'Bạn không có quyền truy cập trang này',
+        variant: 'destructive',
+      });
+      router.push('/');
+    }
+  }, [isAuthenticated, isAdmin, router, toast]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -44,9 +67,9 @@ export function TradingSessionsPage({ token }: { token: string }) {
       const response = await fetch('/api/admin/sessions', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           ...session,
           status: session.status || 'completed' // Ensure status is always set
@@ -77,11 +100,11 @@ export function TradingSessionsPage({ token }: { token: string }) {
   };
 
   // Fetch sessions from database
-  const fetchSessions = async (page: number) => {
+  const fetchSessions = async (page: number = 1) => {
     try {
       const response = await fetch(`/api/admin/sessions?page=${page}&limit=${sessionsPerPage}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        credentials: 'include'
+        });
       
       if (!response.ok) throw new Error('Failed to fetch sessions');
       
@@ -101,8 +124,10 @@ export function TradingSessionsPage({ token }: { token: string }) {
 
   // Initialize current session and set up countdown
   useEffect(() => {
-    fetchSessions(currentPage);
-  }, [currentPage]);
+    if (isAuthenticated() && isAdmin()) {
+      fetchSessions(currentPage);
+    }
+  }, [currentPage, isAuthenticated, isAdmin]);
 
   useEffect(() => {
     const now = new Date();
