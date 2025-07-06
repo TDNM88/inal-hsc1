@@ -25,38 +25,73 @@ const securityHeaders = {
 function setCorsHeaders(response: NextResponse, origin: string) {
   response.headers.set('Access-Control-Allow-Origin', origin);
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   response.headers.set('Access-Control-Allow-Credentials', 'true');
   response.headers.set('Access-Control-Max-Age', '86400'); // 24 giờ
   response.headers.set('Vary', 'Origin');
   return response;
 }
 
+// Hàm lấy token từ request
+function getTokenFromRequest(request: NextRequest): string | null {
+  // Ưu tiên lấy từ header Authorization
+  const authHeader = request.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+  
+  // Nếu không có trong header, thử lấy từ cookie
+  const token = request.cookies.get('token')?.value;
+  if (token) return token;
+  
+  return null;
+}
+
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
   const { pathname } = request.nextUrl;
-  const requestHeaders = new Headers(request.headers);
-  let response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
-
-  // Lấy origin từ request
   const origin = request.headers.get('origin') || '';
-
-  // Kiểm tra origin có trong danh sách cho phép không
   const isAllowedOrigin = allowedOrigins.includes(origin) ||
     (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost'));
 
-  // Xử lý preflight request (OPTIONS)
+  // Xử lý preflight request
   if (request.method === 'OPTIONS') {
-    if (!isAllowedOrigin) {
-      return new NextResponse(null, { status: 403 });
-    }
+    const response = new NextResponse(null, { status: 204 });
+    return setCorsHeaders(response, origin);
+  }
 
-    const preflightResponse = new NextResponse(null, { status: 204 });
-    return setCorsHeaders(preflightResponse, origin);
+  // Tạo response mới với CORS headers nếu cần
+  let response: NextResponse;
+  
+  if (isAllowedOrigin) {
+    const newResponse = NextResponse.next();
+    setCorsHeaders(newResponse, origin);
+    response = newResponse;
+  } else {
+    response = NextResponse.next();
+  }
+
+  // Bỏ qua xác thực cho các route công khai
+  const publicPaths = ['/api/auth', '/_next', '/favicon.ico'];
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
+  
+  if (isPublicPath) {
+    return response;
+  }
+
+  // Lấy token từ request
+  const token = getTokenFromRequest(request);
+  
+  // Kiểm tra token cho các route yêu cầu xác thực
+  if (!token && !pathname.startsWith('/api/auth')) {
+    return NextResponse.json(
+      { message: 'Unauthorized' },
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Xử lý preflight request (OPTIONS) đã được xử lý ở trên
+  if (request.method === 'OPTIONS') {
+    return response;
   }
 
   // Chặn request từ origin không được phép

@@ -45,19 +45,94 @@ const updateUserData = async (userId: string, updates: UserUpdate) => {
   }
 };
 
+interface UserPayload {
+  userId: string;
+  isValid: boolean;
+  role?: string;
+}
+
+// Hàm xác thực người dùng
+async function authenticateRequest(request: Request): Promise<{
+  user?: { id: string; role?: string };
+  error?: string;
+  status?: number;
+}> {
+  // Lấy token từ header hoặc cookie
+  const authHeader = request.headers.get('authorization');
+  let token = '';
+
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else {
+    // Nếu không có trong header, thử lấy từ cookie
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+      
+      token = cookies.token || '';
+    }
+  }
+
+  if (!token) {
+    return { error: 'Không tìm thấy token xác thực', status: 401 };
+  }
+
+  try {
+    const payload = await verifyToken(token) as UserPayload;
+    if (!payload || !payload.isValid) {
+      return { error: 'Token không hợp lệ', status: 401 };
+    }
+    
+    // Lấy thông tin người dùng từ database
+    const db = await getMongoDb();
+    if (!db) {
+      throw new Error('Không thể kết nối đến cơ sở dữ liệu');
+    }
+    
+    const user = await db.collection('users').findOne(
+      { _id: new ObjectId(payload.userId) },
+      { projection: { _id: 1, role: 1 } }
+    );
+    
+    if (!user) {
+      return { error: 'Người dùng không tồn tại', status: 404 };
+    }
+    
+    return { 
+      user: { 
+        id: user._id.toString(),
+        role: user.role
+      } 
+    };
+  } catch (error) {
+    console.error('Lỗi xác thực token:', error);
+    return { error: 'Lỗi xác thực', status: 401 };
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // Xác thực người dùng
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ message: 'Không có quyền truy cập' }, { status: 401 });
+    const authResult = await authenticateRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { message: authResult.error },
+        { status: authResult.status || 401 }
+      );
     }
-
-    const token = authHeader.split(' ')[1];
-    const user = await verifyToken(token);
     
-    if (!user || !user.id) {
-      return NextResponse.json({ message: 'Token không hợp lệ' }, { status: 401 });
+    const { user } = authResult;
+
+    // Kiểm tra user tồn tại
+    if (!user) {
+      return NextResponse.json(
+        { message: 'Người dùng không tồn tại' },
+        { status: 404 }
+      );
     }
 
     // Lấy dữ liệu từ request body
@@ -96,17 +171,23 @@ export async function POST(request: Request) {
 // API để quản trị viên xác minh thông tin ngân hàng
 export async function PUT(request: Request) {
   try {
-    // Xác thực quyền quản trị viên (chỉ admin mới có quyền xác minh)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ message: 'Không có quyền truy cập' }, { status: 401 });
+    // Xác thực người dùng
+    const authResult = await authenticateRequest(request);
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { message: authResult.error },
+        { status: authResult.status || 401 }
+      );
     }
-
-    const token = authHeader.split(' ')[1];
-    const admin = await verifyToken(token);
     
-    if (!admin || admin.role !== 'admin') {
-      return NextResponse.json({ message: 'Không có quyền truy cập' }, { status: 403 });
+    const { user } = authResult;
+    
+    // Kiểm tra quyền admin
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json(
+        { message: 'Không có quyền truy cập' },
+        { status: 403 }
+      );
     }
 
     // Lấy dữ liệu từ request body
