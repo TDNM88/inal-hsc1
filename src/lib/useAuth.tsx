@@ -1,11 +1,13 @@
 "use client"
 
+import React from 'react';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 type User = {
   id: string;
   username: string;
   role: string;
+  avatar?: string;
   balance: {
     available: number;
     frozen: number;
@@ -131,9 +133,9 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const auth = useAuthStandalone();
-  return React.createElement(
-    AuthContext.Provider,
-    { value: auth },
-    children
+  return (
+    <AuthContext.Provider value={auth}>
+      {children}
+    </AuthContext.Provider>
   );
 }
