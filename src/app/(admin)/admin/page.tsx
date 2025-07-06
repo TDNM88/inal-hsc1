@@ -1002,7 +1002,7 @@ const OrderHistoryPage = ({ startDate, setStartDate, endDate, setEndDate }: {
 }
 
 // Main Admin Dashboard Component
-import { TradingSessionsPage } from '@/components/admin/TradingSessionsPage';
+import TradingSessionsPage from '@/components/admin/TradingSessionsPage';
 export default function AdminDashboard() {
   const router = useRouter();
   const { user, isAdmin, isAuthenticated, isLoading, logout } = useAuth();

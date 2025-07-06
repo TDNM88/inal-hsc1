@@ -1,364 +1,363 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { generateSessionId, parseSessionId } from '@/lib/sessionUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, TrendingUp } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
 
-type Session = {
+interface User {
+  id: string;
+  username: string;
+  role: string;
+  avatar?: string;
+  balance: {
+    available: number;
+    frozen: number;
+  };
+  bank?: {
+    name: string;
+    accountNumber: string;
+    accountHolder: string;
+  };
+  verification?: {
+    verified: boolean;
+    cccdFront: string;
+    cccdBack: string;
+  };
+  status?: {
+    active: boolean;
+    betLocked: boolean;
+    withdrawLocked: boolean;
+  };
+  createdAt?: string;
+  lastLogin?: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  logout: () => Promise<void>;
+  isAuthenticated: () => boolean;
+  isAdmin: () => boolean;
+  refreshUser: () => Promise<void>;
+}
+
+interface TradingSession {
+  _id: string;
   sessionId: string;
   result: 'UP' | 'DOWN';
   startTime: string;
   endTime: string;
   status: 'active' | 'completed';
-  _id?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
+  createdAt: string;
+  updatedAt: string;
+}
 
-export function TradingSessionsPage() {
-  const { isAuthenticated, isAdmin } = useAuth();
-  const { toast } = useToast();
-  
-  // Ensure user is authenticated and is admin
+export default function TradingSessionsPage() {
   const router = useRouter();
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      toast({
-        title: 'Lỗi xác thực',
-        description: 'Vui lòng đăng nhập để truy cập trang này',
-        variant: 'destructive',
-      });
-      router.push('/login');
-    } else if (!isAdmin()) {
-      toast({
-        title: 'Lỗi phân quyền',
-        description: 'Bạn không có quyền truy cập trang này',
-        variant: 'destructive',
-      });
-      router.push('/');
-    }
-  }, [isAuthenticated, isAdmin, router, toast]);
+  const { user, isLoading: authLoading, isAdmin } = useAuth();
+  const { toast } = useToast();
+  const [sessions, setSessions] = useState<TradingSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentSession, setCurrentSession] = useState<Session>({
-    sessionId: '',
-    result: 'UP',
-    startTime: new Date().toISOString(),
-    endTime: new Date(Date.now() + 60000).toISOString(),
-    status: 'active'
-  });
-  const [countdown, setCountdown] = useState(60);
-  const [currentPage, setCurrentPage] = useState(1);
-  const sessionsPerPage = 10;
+  const [error, setError] = useState<string | null>(null);
 
-  // Save session result to database
-  const saveSessionResult = async (session: Session) => {
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+      return;
+    }
+
+    if (user && !isAdmin()) {
+      router.push('/');
+      return;
+    }
+
+    fetchSessions();
+  }, [user, authLoading, router]);
+
+  const fetchSessions = async () => {
     try {
-      setIsSaving(true);
+      setIsLoading(true);
+      setError(null);
+      
       const response = await fetch('/api/admin/sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         credentials: 'include',
-        body: JSON.stringify({
-          ...session,
-          status: session.status || 'completed' // Ensure status is always set
-        })
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save session result');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch sessions');
       }
 
-      toast({
-        title: 'Thành công',
-        description: 'Đã lưu kết quả phiên giao dịch',
-      });
-
-      // Refresh sessions list
-      await fetchSessions(currentPage);
-    } catch (error) {
-      console.error('Error saving session result:', error);
-      toast({
-        title: 'Lỗi',
-        description: 'Không thể lưu kết quả phiên giao dịch',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Fetch sessions from database
-  const fetchSessions = async (page: number = 1) => {
-    try {
-      const response = await fetch(`/api/admin/sessions?page=${page}&limit=${sessionsPerPage}`, {
-        credentials: 'include'
-        });
-      
-      if (!response.ok) throw new Error('Failed to fetch sessions');
-      
       const data = await response.json();
-      setSessions(data.sessions || []);
-    } catch (error) {
+      setSessions(data);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       console.error('Error fetching sessions:', error);
+      setError(errorMessage);
       toast({
-        title: 'Lỗi',
-        description: 'Không thể tải danh sách phiên giao dịch',
-        variant: 'destructive'
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Initialize current session and set up countdown
-  useEffect(() => {
-    if (isAuthenticated() && isAdmin()) {
-      fetchSessions(currentPage);
-    }
-  }, [currentPage, isAuthenticated, isAdmin]);
-
-  useEffect(() => {
-    const now = new Date();
-    const currentSessionId = generateSessionId(now);
-    const nextMinute = new Date(now);
-    nextMinute.setMinutes(nextMinute.getMinutes() + 1);
-    nextMinute.setSeconds(0);
-    nextMinute.setMilliseconds(0);
-
-    const newCurrentSession = {
-      sessionId: currentSessionId,
-      result: 'UP' as const,
-      startTime: now.toISOString(),
-      endTime: nextMinute.toISOString(),
-      status: 'active' as const
-    };
-
-    setCurrentSession(newCurrentSession);
-
-    // Set up countdown timer
-    const timer = setInterval(() => {
-      const now = new Date();
-      const secondsLeft = Math.ceil((nextMinute.getTime() - now.getTime()) / 1000);
-      
-      if (secondsLeft <= 0) {
-        // Auto-save and start new session when countdown reaches 0
-        const completedSession: Session = {
-          ...currentSession,
-          status: 'completed',
-          endTime: now.toISOString()
-        };
-        
-        // Save the completed session
-        saveSessionResult(completedSession);
-        
-        // Generate new session ID for the next minute
-        const newNextMinute = new Date(now);
-        newNextMinute.setMinutes(newNextMinute.getMinutes() + 1);
-        newNextMinute.setSeconds(0);
-        newNextMinute.setMilliseconds(0);
-        
-        const newSessionId = generateSessionId(now);
-        const nextSession: Session = {
-          sessionId: newSessionId,
-          result: 'UP',
-          startTime: now.toISOString(),
-          endTime: newNextMinute.toISOString(),
-          status: 'active'
-        };
-        
-        setCurrentSession(nextSession);
-        setCountdown(60);
-        fetchSessions(currentPage);
-      } else {
-        setCountdown(secondsLeft);
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [currentPage]);
-
-  // Handle manual result update
-  const handleResultChange = (result: 'UP' | 'DOWN') => {
-    setCurrentSession(prev => ({
-      ...prev,
-      result
-    }));
+  const formatDateTime = (dateString: string) => {
+    return format(new Date(dateString), 'HH:mm:ss dd/MM/yyyy', { locale: vi });
   };
 
-  // Handle manual save
-  const handleSaveClick = async () => {
-    await saveSessionResult({
-      ...currentSession,
-      status: 'completed',
-      endTime: new Date().toISOString()
-    });
-  };
-
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    fetchSessions(page);
-  };
-
-  if (isLoading) {
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">{error}</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>Please try again later or contact support if the problem persists.</p>
+              </div>
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchSessions}
+                  className="text-red-700 hover:bg-red-100"
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
-        <TrendingUp className="h-4 w-4" />
-        <span>/</span>
-        <span>Phiên giao dịch</span>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Quản lý phiên giao dịch</h1>
+        <Button onClick={() => router.push('/admin/sessions/new')}>
+          Tạo phiên mới
+        </Button>
       </div>
 
-      {/* Current Session Card */}
-      <Card className="bg-gray-800 border-gray-700">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-white">Phiên hiện tại</CardTitle>
+          <CardTitle>Danh sách phiên giao dịch</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <Label className="text-gray-400">Mã phiên</Label>
-                <div className="text-xl font-bold text-white">{currentSession.sessionId}</div>
-              </div>
-              <div>
-                <Label className="text-gray-400">Thời gian còn lại</Label>
-                <div className="text-3xl font-bold text-red-500">{countdown}s</div>
-              </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
             </div>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-gray-400">Kết quả</Label>
-                <div className="flex gap-4 mt-2">
-                  <Button
-                    variant={currentSession.result === 'UP' ? 'default' : 'outline'}
-                    className={`w-24 ${currentSession.result === 'UP' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-                    onClick={() => handleResultChange('UP')}
-                    disabled={isSaving}
-                  >
-                    LÊN
-                  </Button>
-                  <Button
-                    variant={currentSession.result === 'DOWN' ? 'default' : 'outline'}
-                    className={`w-24 ${currentSession.result === 'DOWN' ? 'bg-red-600 hover:bg-red-700' : ''}`}
-                    onClick={() => handleResultChange('DOWN')}
-                    disabled={isSaving}
-                  >
-                    XUỐNG
-                  </Button>
-                </div>
-              </div>
-              <Button 
-                className="w-full md:w-auto" 
-                onClick={handleSaveClick}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Đang lưu...
-                  </>
-                ) : 'Lưu kết quả'}
-              </Button>
+          ) : sessions.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              Chưa có phiên giao dịch nào
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Session History */}
-      <Card className="bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold text-white">Lịch sử phiên giao dịch</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-white">Mã phiên</TableHead>
-                  <TableHead className="text-white">Kết quả</TableHead>
-                  <TableHead className="text-white">Bắt đầu</TableHead>
-                  <TableHead className="text-white">Kết thúc</TableHead>
-                  <TableHead className="text-white">Trạng thái</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sessions.length > 0 ? (
-                  sessions.map((session) => (
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID phiên</TableHead>
+                    <TableHead>Kết quả</TableHead>
+                    <TableHead>Thời gian bắt đầu</TableHead>
+                    <TableHead>Thời gian kết thúc</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead className="text-right">Hành động</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessions.map((session) => (
                     <TableRow key={session._id}>
-                      <TableCell className="font-medium text-white">{session.sessionId}</TableCell>
+                      <TableCell className="font-medium">
+                        {session.sessionId}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          {session.result === 'UP' ? (
+                            <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
+                          )}
+                          <span
+                            className={
+                              session.result === 'UP'
+                                ? 'text-green-600 font-medium'
+                                : 'text-red-600 font-medium'
+                            }
+                          >
+                            {session.result === 'UP' ? 'TĂNG' : 'GIẢM'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 text-gray-500 mr-1" />
+                          {formatDateTime(session.startTime)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {session.status === 'completed' ? (
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 text-gray-500 mr-1" />
+                            {formatDateTime(session.endTime)}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">Đang diễn ra...</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge
-                          variant={session.result === 'UP' ? 'default' : 'destructive'}
-                          className={session.result === 'UP' ? 'bg-green-500 hover:bg-green-500' : 'bg-red-500 hover:bg-red-500'}
+                          variant={
+                            session.status === 'active' ? 'default' : 'secondary'
+                          }
+                          className={
+                            session.status === 'active'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }
                         >
-                          {session.result === 'UP' ? 'LÊN' : 'XUỐNG'}
+                          {session.status === 'active' ? 'ĐANG HOẠT ĐỘNG' : 'ĐÃ KẾT THÚC'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-gray-300">
-                        {new Date(session.startTime).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-gray-300">
-                        {session.endTime ? new Date(session.endTime).toLocaleString() : 'Đang chờ...'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
-                          {session.status === 'completed' ? 'Đã hoàn thành' : 'Đang hoạt động'}
-                        </Badge>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            router.push(`/admin/sessions/${session._id}`)
+                          }
+                        >
+                          Chi tiết
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-gray-400 py-4">
-                      Không có dữ liệu phiên giao dịch
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          
-          {/* Pagination */}
-          <div className="flex items-center justify-between mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-            >
-              Trước
-            </Button>
-            <span className="text-sm text-gray-400">
-              Trang {currentPage}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              disabled={sessions.length < sessionsPerPage}
-            >
-              Tiếp
-            </Button>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+                </CardContent>
+      </Card>
+
+      {/* Session Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Tổng số phiên</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {sessions.length}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Tổng số phiên giao dịch đã tạo
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Phiên tăng</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {sessions.filter(s => s.result === 'UP').length}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Tổng số phiên kết quả tăng
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Phiên giảm</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {sessions.filter(s => s.result === 'DOWN').length}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Tổng số phiên kết quả giảm
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Hoạt động gần đây</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {sessions.slice(0, 5).map((session) => (
+              <div key={session._id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <div className={`p-2 rounded-full ${
+                    session.result === 'UP' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                  }`}>
+                    {session.result === 'UP' ? (
+                      <TrendingUp className="h-5 w-5" />
+                    ) : (
+                      <TrendingDown className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">
+                      Phiên {session.sessionId} - {session.result === 'UP' ? 'TĂNG' : 'GIẢM'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {formatDateTime(session.startTime)}
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  variant={session.status === 'active' ? 'default' : 'outline'}
+                  className={session.status === 'active' ? 'bg-blue-100 text-blue-800' : ''}
+                >
+                  {session.status === 'active' ? 'ĐANG HOẠT ĐỘNG' : 'ĐÃ KẾT THÚC'}
+                </Badge>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
