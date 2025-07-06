@@ -61,7 +61,9 @@ function useAuthStandalone(): AuthContextType {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', {
+        credentials: 'include' // This ensures cookies are sent with the request
+      });
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
@@ -79,6 +81,7 @@ function useAuthStandalone(): AuthContextType {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
+        credentials: 'include' // This ensures cookies are sent with the request
       });
       
       const data = await res.json();
@@ -97,7 +100,10 @@ function useAuthStandalone(): AuthContextType {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include' // This ensures cookies are sent with the request
+      });
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);

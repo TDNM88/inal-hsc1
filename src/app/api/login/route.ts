@@ -65,6 +65,7 @@ export async function POST(request: Request) {
       maxAge: 60 * 60 * 24 * 7, // 1 week
       path: "/",
       sameSite: "lax",
+      domain: process.env.NODE_ENV === "production" ? ".yourdomain.com" : undefined
     })
 
     return response
