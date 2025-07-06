@@ -1,30 +1,27 @@
-import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import { AuthProvider } from "@/lib/useAuth"
-import { Toaster } from "@/components/ui/toaster"
+import { Inter } from 'next/font/google';
+import './globals.css';
+import ClientLayout from './ClientLayout';
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ['latin'] });
 
-export const metadata: Metadata = {
-  title: "Trading Platform",
-  description: "Nền tảng giao dịch trực tuyến",
-}
+export { metadata } from './metadata';
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
-      <body className={inter.className}>
-        <AuthProvider>
+    <html lang="vi" suppressHydrationWarning>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body className={`${inter.className} min-h-screen bg-background`}>
+        <ClientLayout>
           {children}
-          <Toaster />
-        </AuthProvider>
+        </ClientLayout>
       </body>
     </html>
-  )
+  );
 }

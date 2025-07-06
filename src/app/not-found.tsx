@@ -5,6 +5,21 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
+// Đảm bảo React được khai báo trong phạm vi toàn cục
+declare global {
+  // eslint-disable-next-line no-var, @typescript-eslint/no-namespace
+  namespace NodeJS {
+    interface Global {
+      React: typeof React;
+    }
+  }
+}
+
+// Chỉ gán trong môi trường browser
+if (typeof window !== 'undefined' && !(window as any).React) {
+  (window as any).React = React;
+}
+
 export default function NotFound() {
   const router = useRouter();
   
