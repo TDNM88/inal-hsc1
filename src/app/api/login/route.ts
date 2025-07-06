@@ -58,15 +58,20 @@ export async function POST(request: Request) {
       },
     })
 
-    // Set cookie
+    // Set cookie with development-friendly settings
+    const isProduction = process.env.NODE_ENV === 'production';
     response.cookies.set("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isProduction,
       maxAge: 60 * 60 * 24 * 7, // 1 week
       path: "/",
-      sameSite: "lax",
-      domain: process.env.NODE_ENV === "production" ? ".yourdomain.com" : undefined
-    })
+      sameSite: isProduction ? "lax" : "lax",
+      // In development, don't set domain to allow localhost cookies to work
+      domain: isProduction ? ".yourdomain.com" : undefined
+    });
+    
+    // For debugging
+    console.log('Login successful, token set:', token.substring(0, 10) + '...');
 
     return response
   } catch (error) {

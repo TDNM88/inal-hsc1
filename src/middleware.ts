@@ -76,6 +76,14 @@ export function middleware(request: NextRequest) {
 
   // Public routes that don't require authentication
   const publicRoutes = ["/", "/login", "/register"];
+  
+  // API routes that don't require authentication
+  const publicApiRoutes = ["/api/auth/me"];
+  
+  // Skip auth check for public API routes
+  if (publicApiRoutes.some(route => pathname.startsWith(route))) {
+    return response;
+  }
 
   // API routes that should be handled separately
   if (pathname.startsWith("/api/")) {
@@ -115,9 +123,17 @@ export function middleware(request: NextRequest) {
   // Static files and Next.js internals
   if (
     pathname.startsWith("/_next/") ||
-    pathname.startsWith("/favicon.ico") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/site.webmanifest" ||
     pathname.startsWith("/images/") ||
-    pathname.startsWith("/icons/")
+    pathname.startsWith("/icons/") ||
+    pathname.endsWith(".png") ||
+    pathname.endsWith(".jpg") ||
+    pathname.endsWith(".jpeg") ||
+    pathname.endsWith(".gif") ||
+    pathname.endsWith(".svg") ||
+    pathname.endsWith(".css") ||
+    pathname.endsWith(".js")
   ) {
     return response;
   }
@@ -164,7 +180,13 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - site.webmanifest (web app manifest)
+     * - images/ (image files)
+     * - icons/ (icon files)
+     * - assets/ (static assets)
+     * - public/ (public files)
+     * - .*\..* (files with extensions)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|site.webmanifest|.*\..*|images/.*|icons/.*|assets/.*|public/.*).*)",
   ],
 }

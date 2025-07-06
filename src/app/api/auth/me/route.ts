@@ -7,16 +7,24 @@ export async function GET(request: Request) {
   try {
     // Get token from cookie
     const cookies = request.headers.get("cookie") || ""
+    console.log('Cookies:', cookies); // Debug log
+    
     const tokenMatch = cookies.match(/token=([^;]+)/)
+    console.log('Token match:', tokenMatch ? 'found' : 'not found'); // Debug log
 
     if (!tokenMatch) {
+      console.log('No token found in cookies');
       return NextResponse.json({ success: false, message: "Chưa đăng nhập" }, { status: 401 })
     }
 
     const token = tokenMatch[1]
+    console.log('Token found, length:', token.length); // Debug log
+    
     const tokenData = parseToken(token)
+    console.log('Parsed token data:', tokenData); // Debug log
 
     if (!tokenData) {
+      console.log('Invalid token format');
       return NextResponse.json({ success: false, message: "Token không hợp lệ" }, { status: 401 })
     }
 

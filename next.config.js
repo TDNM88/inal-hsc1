@@ -26,12 +26,13 @@ const nextConfig = {
     }
     return config;
   },
-  // Configuration from next.config.js
+  // Configuration for API rewrites
   async rewrites() {
     return [
+      // Only proxy specific API routes to the external API
       {
-        source: '/api/:path*',
-        destination: 'https://inal-hsc-api.vercel.app/api/:path*'
+        source: '/api/game/:path*',
+        destination: 'https://inal-hsc-api.vercel.app/api/game/:path*'
       },
       {
         source: '/ws/:path*',
