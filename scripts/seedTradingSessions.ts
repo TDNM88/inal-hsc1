@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { getMongoDb } from '../src/lib/db.js';
 import TradingSession from '../src/models/TradingSession.js';
+import { fileURLToPath } from 'url';
 
 // Load biến môi trường
 import '../scripts/load-env.js';
@@ -105,11 +106,6 @@ export default async function seedTradingSessions() {
         updatedAt: new Date()
       });
     }
-    
-    // Thêm vào database
-    await TradingSession.insertMany(sessions);
-    console.log(`✅ Đã thêm thành công ${sessions.length} phiên giao dịch`);
-    
     // Đóng kết nối
     await mongoose.connection.close();
     console.log('✅ Đã đóng kết nối MongoDB');
@@ -121,7 +117,19 @@ export default async function seedTradingSessions() {
   }
 }
 
+// Hàm chính
+async function main() {
+  try {
+    await seedTradingSessions();
+    console.log('✅ Đã hoàn thành tạo dữ liệu mẫu');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Lỗi khi tạo dữ liệu mẫu:', error);
+    process.exit(1);
+  }
+}
+
 // Chạy script khi được gọi trực tiếp
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  seedTradingSessions().catch(console.error);
+  main().catch(console.error);
 }

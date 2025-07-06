@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { verifyToken } from '@/lib/auth';
 
 // Danh sách domain được phép truy cập
 const allowedOrigins = [
@@ -34,20 +35,47 @@ function setCorsHeaders(response: NextResponse, origin: string) {
 
 // Hàm lấy token từ request
 function getTokenFromRequest(request: NextRequest): string | null {
-  // Ưu tiên lấy từ header Authorization
+  console.log('Getting token from request...');
+  
+  // 1. Ưu tiên lấy từ header Authorization
   const authHeader = request.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.split(' ')[1];
+    const token = authHeader.split(' ')[1];
+    console.log('Got token from Authorization header');
+    return token;
   }
   
-  // Nếu không có trong header, thử lấy từ cookie
-  const token = request.cookies.get('token')?.value;
-  if (token) return token;
+  // 2. Thử lấy từ cookie
+  const cookieHeader = request.headers.get('cookie');
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=');
+      acc[key] = value;
+      return acc;
+    }, {} as Record<string, string>);
+    
+    const token = cookies['token'];
+    if (token) {
+      console.log('Got token from cookie');
+      return token;
+    }
+  }
   
+  // 3. Thử lấy từ localStorage (cho client-side rendering)
+  // Lưu ý: Middleware chạy trên server nên không thể truy cập trực tiếp localStorage
+  // Nhưng có thể kiểm tra xem có token trong URL không (cho trường hợp redirect từ OAuth)
+  const url = new URL(request.url);
+  const tokenFromUrl = url.searchParams.get('token');
+  if (tokenFromUrl) {
+    console.log('Got token from URL');
+    return tokenFromUrl;
+  }
+  
+  console.log('No token found in request');
   return null;
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get('origin') || '';
   const isAllowedOrigin = allowedOrigins.includes(origin) ||
@@ -78,15 +106,43 @@ export function middleware(request: NextRequest) {
     return response;
   }
 
+  // Bỏ qua xác thực cho các route cụ thể
+  const authWhitelist = [
+    '/api/auth',
+    '/_next',
+    '/favicon.ico',
+    '/api/health'
+  ];
+  
+  const shouldSkipAuth = authWhitelist.some(path => 
+    pathname.startsWith(path)
+  );
+  
+  if (shouldSkipAuth) {
+    return response;
+  }
+  
   // Lấy token từ request
   const token = getTokenFromRequest(request);
+  console.log('Token in middleware:', token ? 'Token exists' : 'No token');
   
-  // Kiểm tra token cho các route yêu cầu xác thực
-  if (!token && !pathname.startsWith('/api/auth')) {
-    return NextResponse.json(
-      { message: 'Unauthorized' },
-      { status: 401, headers: { 'Content-Type': 'application/json' } }
-    );
+  // Kiểm tra token
+  if (!token) {
+    console.log('No token found in request');
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+  
+  // Kiểm tra token hợp lệ
+  const { isValid } = await verifyToken(token);
+  if (!isValid) {
+    console.log('Invalid or expired token');
+    
+    // Xóa cookie token nếu không hợp lệ
+    response.cookies.delete('token');
+    
+    return NextResponse.redirect(new URL('/login', request.url), {
+      headers: response.headers
+    });
   }
 
   // Xử lý preflight request (OPTIONS) đã được xử lý ở trên
@@ -178,10 +234,20 @@ export function middleware(request: NextRequest) {
     pathname === route || pathname.startsWith(`${route}/`)
   );
 
-  // If no token and trying to access protected route
-  if (!token && !isPublicRoute) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+  // Nếu không có token, chuyển hướng về trang đăng nhập
+  if (!token) {
+    console.log('No token found, redirecting to login');
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('from', pathname);
+    
+    // Nếu là API request, trả về lỗi 401 thay vì redirect
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ message: 'Unauthorized' }), 
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return NextResponse.redirect(loginUrl);
   }
 

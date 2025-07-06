@@ -116,43 +116,111 @@ async function authenticateRequest(request: Request): Promise<{
 
 export async function POST(request: Request) {
   try {
-    // Xác thực người dùng
-    const authResult = await authenticateRequest(request);
-    if ('error' in authResult) {
+    console.log('=== BẮT ĐẦU XỬ LÝ REQUEST ===');
+    
+    // Lấy token từ header hoặc cookie
+    const authHeader = request.headers.get('authorization');
+    let token = '';
+
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+      console.log('Nhận được token từ Authorization header');
+    } else {
+      // Nếu không có trong header, thử lấy từ cookie
+      const cookieHeader = request.headers.get('cookie') || '';
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+      
+      token = cookies.token || '';
+      console.log('Nhận được token từ cookie:', token ? 'Có token' : 'Không có token');
+    }
+
+    if (!token) {
+      console.error('Không tìm thấy token trong request');
       return NextResponse.json(
-        { message: authResult.error },
-        { status: authResult.status || 401 }
+        { message: 'Không tìm thấy token xác thực' },
+        { status: 401 }
       );
     }
     
-    const { user } = authResult;
-
-    // Kiểm tra user tồn tại
-    if (!user) {
+    // Xác thực token
+    console.log('Đang xác thực token...');
+    const { userId: verifiedUserId, isValid } = await verifyToken(token);
+    
+    if (!isValid || !verifiedUserId) {
+      console.error('Token không hợp lệ hoặc đã hết hạn');
       return NextResponse.json(
-        { message: 'Người dùng không tồn tại' },
+        { message: 'Token không hợp lệ hoặc đã hết hạn' },
+        { status: 401 }
+      );
+    }
+    
+    console.log('Token hợp lệ, userId:', verifiedUserId);
+    
+    // Lấy thông tin người dùng từ database
+    const db = await getMongoDb();
+    if (!db) {
+      console.error('Không thể kết nối đến cơ sở dữ liệu');
+      return NextResponse.json(
+        { message: 'Lỗi server: Không thể kết nối đến cơ sở dữ liệu' },
+        { status: 500 }
+      );
+    }
+    
+    const user = await db.collection('users').findOne({ _id: new ObjectId(verifiedUserId) });
+    
+    if (!user) {
+      console.error('Không tìm thấy người dùng với ID:', verifiedUserId);
+      return NextResponse.json(
+        { message: 'Không tìm thấy thông tin người dùng' },
         { status: 404 }
       );
     }
+    
+    console.log('Đã tìm thấy người dùng:', user.username);
 
     // Lấy dữ liệu từ request body
-    const data = await request.json();
+    console.log('Đang đọc request body...');
+    const data = await request.json().catch(e => {
+      console.error('Lỗi khi đọc request body:', e);
+      throw new Error('Dữ liệu không hợp lệ');
+    });
+    
+    console.log('Dữ liệu nhận được từ client:', data);
+    
     const { name, accountHolder, accountNumber } = data;
+    
+    if (!name || !accountHolder || !accountNumber) {
+      console.error('Thiếu thông tin bắt buộc:', { name, accountHolder, accountNumber });
+      return NextResponse.json(
+        { message: 'Vui lòng điền đầy đủ thông tin' },
+        { status: 400 }
+      );
+    }
     
     // Kiểm tra dữ liệu hợp lệ
     if (!name || !accountHolder || !accountNumber) {
       return NextResponse.json({ message: 'Thông tin không đầy đủ' }, { status: 400 });
     }
 
-    // Cập nhật thông tin ngân hàng (chưa xác minh)
-    const updatedUser = await updateUserData(user.id, {
-      bank: {
-        name,
-        accountHolder,
-        accountNumber,
-        verified: false, // Mặc định là chưa xác minh
-      }
+    // Cập nhật thông tin ngân hàng
+    console.log('Đang cập nhật thông tin ngân hàng...');
+    const bankData = {
+      name,
+      accountHolder,
+      accountNumber,
+      verified: false, // Mặc định là chưa xác minh
+      updatedAt: new Date()
+    };
+    
+    const updatedUser = await updateUserData(verifiedUserId, {
+      bank: bankData
     });
+    
+    console.log('Đã cập nhật thông tin ngân hàng thành công');
 
     // Trả về kết quả thành công
     return NextResponse.json({
@@ -171,16 +239,45 @@ export async function POST(request: Request) {
 // API để quản trị viên xác minh thông tin ngân hàng
 export async function PUT(request: Request) {
   try {
-    // Xác thực người dùng
-    const authResult = await authenticateRequest(request);
-    if ('error' in authResult) {
+    // Lấy token từ cookie hoặc header
+    const getToken = (req: Request): string | null => {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        return authHeader.split(' ')[1];
+      }
+      
+      const cookies = req.headers.get('cookie') || '';
+      const tokenMatch = cookies.match(/token=([^;]+)/);
+      return tokenMatch ? tokenMatch[1] : null;
+    };
+    
+    const token = getToken(request);
+    if (!token) {
       return NextResponse.json(
-        { message: authResult.error },
-        { status: authResult.status || 401 }
+        { message: 'Không tìm thấy token xác thực' },
+        { status: 401 }
       );
     }
     
-    const { user } = authResult;
+    // Xác thực token
+    const { userId: adminUserId, isValid } = await verifyToken(token);
+    if (!isValid || !adminUserId) {
+      return NextResponse.json(
+        { message: 'Token không hợp lệ hoặc đã hết hạn' },
+        { status: 401 }
+      );
+    }
+    
+    // Lấy thông tin người dùng từ database
+    const db = await getMongoDb();
+    const user = await db.collection('users').findOne({ _id: new ObjectId(adminUserId) });
+    
+    if (!user) {
+      return NextResponse.json(
+        { message: 'Không tìm thấy thông tin người dùng' },
+        { status: 404 }
+      );
+    }
     
     // Kiểm tra quyền admin
     if (!user || user.role !== 'admin') {

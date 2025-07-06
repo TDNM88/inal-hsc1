@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
 import { Menu, X, Loader2 } from 'lucide-react';
+import loading from '@/app/(auth)/login/loading';
 
 export default function AccountPage() {
-  const { user, token, loading, logout } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
@@ -86,11 +87,18 @@ export default function AccountPage() {
       formData.append('document', file);
       formData.append('type', type);
       
-      const res = await fetch('/api/upload', {  // Sửa lại đường dẫn API
+      // Lấy token từ cookie
+      const authToken = getCookie('token');
+      if (!authToken) {
+        throw new Error('Không tìm thấy thông tin xác thực');
+      }
+      
+      const res = await fetch('/api/upload', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${authToken}`
         },
+        credentials: 'include',
         body: formData
       });
       
@@ -146,7 +154,7 @@ export default function AccountPage() {
       });
       
       // Kiểm tra trạng thái xác minh
-      setIsVerified(user.bank.verified === true);
+      setIsVerified(user.verification?.verified === true);
     }
   }, [user]);
   
@@ -184,12 +192,19 @@ export default function AccountPage() {
       setIsUpdatingPassword(true);
       setPasswordError('');
 
+      // Lấy token từ cookie
+      const authToken = getCookie('token');
+      if (!authToken) {
+        throw new Error('Không tìm thấy thông tin xác thực');
+      }
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${authToken}`
         },
+        credentials: 'include',
         body: JSON.stringify({
           currentPassword: passwordForm.currentPassword,
           newPassword: passwordForm.newPassword
@@ -223,6 +238,27 @@ export default function AccountPage() {
     }
   };
   
+  // Hàm lấy cookie - cải tiến để xử lý trường hợp chạy trên server
+  const getCookie = (name: string): string | null => {
+    if (typeof document === 'undefined') {
+      // Nếu đang chạy phía server, trả về null
+      console.log('Running on server, cannot access document.cookie');
+      return null;
+    }
+    
+    try {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      const cookieValue = parts.length === 2 ? parts.pop()?.split(';').shift() || null : null;
+      
+      console.log(`Cookie '${name}':`, cookieValue ? 'Found' : 'Not found');
+      return cookieValue;
+    } catch (error) {
+      console.error('Error accessing cookie:', error);
+      return null;
+    }
+  };
+
   // Submit bank information
   const handleSubmitBankInfo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,32 +269,119 @@ export default function AccountPage() {
       return;
     }
     
+    // Lấy token từ các nguồn khác nhau
+    let authToken = '';
+    
+    // 1. Thử lấy từ cookie
+    authToken = getCookie('token') || '';
+    console.log('Auth token from cookie:', authToken ? 'Found' : 'Not found');
+    
+    // 2. Nếu không có trong cookie, thử lấy từ localStorage
+    if (!authToken && typeof window !== 'undefined') {
+      authToken = localStorage.getItem('token') || '';
+      console.log('Auth token from localStorage:', authToken ? 'Found' : 'Not found');
+    }
+    
+    // 3. Nếu vẫn không có token, kiểm tra xem có trong URL không (cho trường hợp OAuth)
+    if (!authToken && typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      const tokenFromUrl = url.searchParams.get('token');
+      if (tokenFromUrl) {
+        authToken = tokenFromUrl;
+        console.log('Found token in URL');
+      }
+    }
+    
+    console.log('Auth token:', authToken ? 'Token exists' : 'No token found');
+    
+    if (!authToken) {
+      console.error('No auth token found in cookies or context');
+      toast({ 
+        variant: 'destructive', 
+        title: 'Lỗi xác thực', 
+        description: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' 
+      });
+      // Chuyển hướng về trang đăng nhập sau 2 giây
+      setTimeout(() => {
+        router.push('/login');
+      }, 2000);
+      return;
+    }
+    
     setIsSaving(true);
     
     try {
-      const res = await fetch('/api/users/bank-info', {
+      const requestBody = {
+        accountHolder: bankForm.fullName,
+        name: bankForm.bankName,
+        accountNumber: bankForm.accountNumber
+      };
+      
+      console.log('Sending request to /api/users/bank-info with:', requestBody);
+      
+      // Chuẩn bị headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+      
+      // Thêm Authorization header nếu có token
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      
+      // Lưu thông tin ngân hàng
+      const response = await fetch('/api/users/bank-info', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          accountHolder: bankForm.fullName,
-          name: bankForm.bankName,
-          accountNumber: bankForm.accountNumber
-        }),
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(requestBody),
       });
       
-      const data = await res.json();
+      const data = await response.json().catch(e => {
+        console.error('Error parsing JSON response:', e);
+        return { message: 'Lỗi khi xử lý phản hồi từ máy chủ' };
+      });
       
-      if (res.ok) {
-        toast({ title: 'Thành công', description: 'Thông tin ngân hàng đã được cập nhật' });
+      console.log('Response from server:', {
+        status: response.status,
+        statusText: response.statusText,
+        data
+      });
+      
+      if (response.ok) {
+        toast({ 
+          title: 'Thành công', 
+          description: 'Thông tin ngân hàng đã được cập nhật',
+          variant: 'default'
+        });
+        
+        // Cập nhật thông tin người dùng hiện tại
+        if (user) {
+          const updatedUser = { ...user };
+          updatedUser.bank = {
+            name: bankForm.bankName,
+            accountHolder: bankForm.fullName,
+            accountNumber: bankForm.accountNumber,
+            // verified được quản lý bởi verification ở cấp user
+          };
+          // Có thể cập nhật context/state người dùng ở đây nếu cần
+        }
       } else {
-        toast({ variant: 'destructive', title: 'Lỗi', description: data.message || 'Không thể cập nhật thông tin' });
+        throw new Error(data.message || 'Không thể cập nhật thông tin');
       }
     } catch (error) {
-      console.error('Bank info update error:', error);
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể kết nối đến máy chủ' });
+      console.error('Lỗi khi cập nhật thông tin ngân hàng:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Lỗi', 
+        description: error instanceof Error ? error.message : 'Không thể kết nối đến máy chủ' 
+      });
+      
+      // Nếu lỗi 401, chuyển hướng đến trang đăng nhập
+      if (error instanceof Error && error.message.includes('401')) {
+        router.push('/login');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -271,7 +394,7 @@ export default function AccountPage() {
     }
   }, [user, loading, router, toast]);
 
-  if (loading) {
+  if (loading()) {
     return <div className="flex justify-center items-center h-[60vh] text-gray-400">Đang tải...</div>;
   }
 

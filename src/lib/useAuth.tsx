@@ -109,6 +109,9 @@ function useAuthStandalone(): AuthContextType {
         console.error('Validation failed: Missing username or password');
         return { success: false, message: 'Vui lòng nhập tên đăng nhập và mật khẩu' };
       }
+      
+      // Clear any existing auth state
+      setUser(null);
 
       // Create full URL to ensure it's correct
       const apiUrl = new URL('/api/login', window.location.origin).toString();
@@ -169,13 +172,23 @@ function useAuthStandalone(): AuthContextType {
       }
       
       if (res.ok && data?.success) {
-        console.log('Login API call successful, verifying authentication...');
+        console.log('Login API call successful, response:', data);
         
-        // Add a small delay to ensure the cookie is set
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Lấy token từ response nếu có
+        const token = data.token || data.accessToken;
+        if (token) {
+          console.log('Token received in response, storing...');
+          // Lưu token vào localStorage để sử dụng cho các request sau
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('token', token);
+          }
+        }
+        
+        // Thêm delay để đảm bảo cookie được thiết lập
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         try {
-          // Try to get the current user
+          // Thử lấy thông tin người dùng
           console.log('Attempting to fetch current user...');
           const meResponse = await fetch('/api/auth/me', {
             method: 'GET',
@@ -183,7 +196,8 @@ function useAuthStandalone(): AuthContextType {
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Pragma': 'no-cache',
-              'Expires': '0'
+              'Expires': '0',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
             }
           });
           
@@ -195,8 +209,14 @@ function useAuthStandalone(): AuthContextType {
             
             if (meData?.success && meData.user) {
               console.log('Authentication verified, setting user in context');
-              setUser(meData.user);
-              return { success: true };
+              // Cập nhật thông tin người dùng
+              const userData = {
+                ...meData.user,
+                // Đảm bảo các trường bắt buộc tồn tại
+                balance: meData.user.balance || { available: 0, frozen: 0 }
+              };
+              setUser(userData);
+              return { success: true, message: 'Đăng nhập thành công' };
             } else {
               console.error('Auth/me response missing user data:', meData);
             }
