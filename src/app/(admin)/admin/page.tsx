@@ -1509,25 +1509,46 @@ function IdentityVerificationPage({ token }: { token: string | null }) {
 // Main Admin Dashboard Component
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user, token, loading, logout } = useAuth();
+  const { user, isAdmin, isAuthenticated, isLoading, logout, token } = useAuth();
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Collapsed by default on mobile
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const { toast } = useToast();
 
+  // Redirect to login if not authenticated or not admin
   useEffect(() => {
-    if (!loading && (!user || user.role !== 'admin')) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Chỉ admin mới có quyền truy cập' });
+    if (!isLoading && !isAuthenticated()) {
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: 'Vui lòng đăng nhập để truy cập trang quản trị'
+      });
       router.push('/login');
+      return;
     }
-  }, [user, loading, router, toast]);
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
+    if (!isLoading && isAuthenticated() && !isAdmin()) {
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: 'Bạn không có quyền truy cập trang này'
+      });
+      router.push('/');
+    }
+  }, [user, isLoading, isAuthenticated, isAdmin, router, toast]);
+
+  // Show loading state
+  if (isLoading || !token) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-900">
+        <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+      </div>
+    );
   }
 
-  if (!user || user.role !== 'admin') {
+  // Don't render anything if not authenticated or not admin
+  if (!isAuthenticated() || !isAdmin() || !user) {
     return null;
   }
 

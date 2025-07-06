@@ -32,6 +32,7 @@ type User = {
 
 type AuthContextType = {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
@@ -45,13 +46,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    console.warn('useAuth must be used within an AuthProvider. Using standalone implementation.');
+    return useAuthStandalone();
   }
   return context;
 }
 
 function useAuthStandalone(): AuthContextType {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('authToken');
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -60,13 +68,24 @@ function useAuthStandalone(): AuthContextType {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+      } else {
+        setUser(null);
+        localStorage.removeItem('authToken');
+        setToken(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
+      setUser(null);
+      localStorage.removeItem('authToken');
+      setToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +101,9 @@ function useAuthStandalone(): AuthContextType {
       
       const data = await res.json();
       
-      if (res.ok) {
+      if (res.ok && data.token) {
+        localStorage.setItem('authToken', data.token);
+        setToken(data.token);
         await checkAuth();
         return { success: true };
       } else {
@@ -96,15 +117,22 @@ function useAuthStandalone(): AuthContextType {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
       setUser(null);
+      localStorage.removeItem('authToken');
+      setToken(null);
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
   const isAuthenticated = () => {
-    return user !== null;
+    return user !== null && token !== null;
   };
 
   const isAdmin = () => {
@@ -117,6 +145,7 @@ function useAuthStandalone(): AuthContextType {
 
   return {
     user,
+    token,
     isLoading,
     login,
     logout,

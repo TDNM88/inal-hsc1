@@ -5,25 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-// Tạo metadata riêng cho trang 404
-export const metadata = {
-  title: 'Không tìm thấy trang',
-  description: 'Trang bạn đang tìm kiếm không tồn tại',
-};
-
-// Đảm bảo React được khai báo trong phạm vi toàn cục
-declare global {
-  // eslint-disable-next-line no-var, @typescript-eslint/no-namespace
-  namespace NodeJS {
-    interface Global {
-      React: typeof React;
-    }
-  }
-}
-
-// Chỉ gán trong môi trường browser
-if (typeof window !== 'undefined' && !(window as any).React) {
-  (window as any).React = React;
+// Ensure React is available globally
+if (typeof window !== 'undefined') {
+  window.React = window.React || React;
 }
 
 export default function NotFound() {
