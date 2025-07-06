@@ -1,17 +1,21 @@
-"use client"
+'use client';
 
-import type React from "react"
+// Ensure React is loaded first
+import React, { useState, useEffect } from 'react';
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/useAuth"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff, CheckCircle } from "lucide-react"
+// Import other dependencies
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/useAuth';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
+
+// Import the React global initializer
+import '@/lib/ensure-react';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({

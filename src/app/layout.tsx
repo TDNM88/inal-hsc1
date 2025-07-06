@@ -1,7 +1,17 @@
+// This file is required to be at the root of the app directory
+'use client';
+
+// Ensure React is loaded first
+import React from 'react';
+
+// Import other dependencies
 import { Inter } from 'next/font/google';
 import './globals.css';
 import ClientLayout from './ClientLayout';
 import { metadata, viewport } from './metadata';
+
+// Import the React global initializer
+import '@/lib/ensure-react';
 
 const inter = Inter({ subsets: ['latin'] });
 

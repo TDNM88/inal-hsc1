@@ -15,6 +15,17 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  webpack: (config, { isServer }) => {
+    // Đảm bảo React được tải trước
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        react: 'react',
+        'react-dom': 'react-dom',
+      };
+    }
+    return config;
+  },
   // Configuration from next.config.js
   async rewrites() {
     return [

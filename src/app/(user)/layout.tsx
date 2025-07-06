@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
 import Header from '@/components/Header';
+
+// Import global React types
+import '@/lib/react-global';
 
 export default function TradeLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
