@@ -56,7 +56,10 @@ export function TradingSessionsPage({ token }: { token: string }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(session)
+        body: JSON.stringify({
+          ...session,
+          status: session.status || 'completed' // Ensure status is always set
+        })
       });
 
       if (!response.ok) {
@@ -130,36 +133,40 @@ export function TradingSessionsPage({ token }: { token: string }) {
 
     // Set up countdown timer
     const timer = setInterval(() => {
-      const secondsLeft = Math.ceil((nextMinute.getTime() - new Date().getTime()) / 1000);
-      setCountdown(Math.max(0, secondsLeft));
-
-      // When countdown reaches 0, save the session and start a new one
+      const now = new Date();
+      const secondsLeft = Math.ceil((nextMinute.getTime() - now.getTime()) / 1000);
+      
       if (secondsLeft <= 0) {
-        saveSessionResult({
-          ...newCurrentSession,
+        // Auto-save and start new session when countdown reaches 0
+        const completedSession: Session = {
+          ...currentSession,
           status: 'completed',
-          endTime: new Date().toISOString()
-        }).then(() => {
-          // After saving, start a new session
-          const newNow = new Date();
-          const newSessionId = generateSessionId(newNow);
-          const newNextMinute = new Date(newNow);
-          newNextMinute.setMinutes(newNextMinute.getMinutes() + 1);
-          newNextMinute.setSeconds(0);
-          newNextMinute.setMilliseconds(0);
-
-          const nextSession = {
-            sessionId: newSessionId,
-            result: 'UP' as const,
-            startTime: newNow.toISOString(),
-            endTime: newNextMinute.toISOString(),
-            status: 'active' as const
-          };
-
-          setCurrentSession(nextSession);
-          setCountdown(60);
-          fetchSessions(currentPage);
-        });
+          endTime: now.toISOString()
+        };
+        
+        // Save the completed session
+        saveSessionResult(completedSession);
+        
+        // Generate new session ID for the next minute
+        const newNextMinute = new Date(now);
+        newNextMinute.setMinutes(newNextMinute.getMinutes() + 1);
+        newNextMinute.setSeconds(0);
+        newNextMinute.setMilliseconds(0);
+        
+        const newSessionId = generateSessionId(now);
+        const nextSession: Session = {
+          sessionId: newSessionId,
+          result: 'UP',
+          startTime: now.toISOString(),
+          endTime: newNextMinute.toISOString(),
+          status: 'active'
+        };
+        
+        setCurrentSession(nextSession);
+        setCountdown(60);
+        fetchSessions(currentPage);
+      } else {
+        setCountdown(secondsLeft);
       }
     }, 1000);
 

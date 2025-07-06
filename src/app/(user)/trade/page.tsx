@@ -32,7 +32,7 @@ interface TradeResult {
 }
 
 const QUICK_AMOUNTS = [50000, 100000, 200000, 500000, 1000000, 2000000, 5000000, 10000000];
-const SESSION_DURATION = 30; // 30 seconds per session
+const SESSION_DURATION = 60; // 60 seconds per session
 const RESULT_DELAY = 5; // 5 seconds delay for result
 
 const formatCurrency = (value: number): string => {

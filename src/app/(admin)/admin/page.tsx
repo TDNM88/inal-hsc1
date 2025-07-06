@@ -3,10 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { Loader2, Home, TrendingUp, Bell, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Home, TrendingUp, Bell, HelpCircle, ChevronLeft, ChevronRight, Table as TableIcon, Badge as BadgeIcon, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { TradingSessionsPage } from '@/components/admin/TradingSessionsPage';
+import { Input } from 'components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from 'components/ui/table';
+import useSWR from 'swr';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from 'components/ui/dialog';
+import { Label } from 'components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from 'components/ui/select';
+import { Badge } from 'components/ui/badge';
 import UserMenu from '@/components/user-menu';
 
 type PageType = 'dashboard' | 'trading-sessions';
@@ -387,7 +395,7 @@ function CustomersPage({ token }: any) {
                     <TableCell>{customer.lastLoginIp || 'N/A'}</TableCell>
                     <TableCell>
                       {customer.verification?.verified ? (
-                        <Badge variant="success">Đã xác minh</Badge>
+                        <Badge variant="default">Đã xác minh</Badge>
                       ) : (
                         <Badge variant="destructive">Chưa xác minh</Badge>
                       )}

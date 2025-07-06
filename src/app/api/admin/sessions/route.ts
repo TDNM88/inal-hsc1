@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { sessionId, result, startTime, endTime } = body;
+    const { sessionId, result, startTime, endTime, status } = body;
 
-    if (!sessionId || !result || !startTime || !endTime) {
+    if (!sessionId || !result || !startTime || !endTime || !status) {
       return NextResponse.json(
         { success: false, message: 'Missing required fields' },
         { status: 400 }
@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
         { 
           $set: { 
             result,
+            status,
             endTime: new Date(endTime),
             updatedAt: new Date()
           } 
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
         result,
         startTime: new Date(startTime),
         endTime: new Date(endTime),
-        status: 'completed',
+        status: status || 'completed',
         createdAt: new Date(),
         updatedAt: new Date()
       });
