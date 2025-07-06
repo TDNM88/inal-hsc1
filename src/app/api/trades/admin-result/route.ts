@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getMongoDb } from '@/lib/db';
 import { getToken } from 'next-auth/jwt';
 import { NextRequest } from 'next/server';
+import { parseSessionId } from '@/lib/sessionUtils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,9 +30,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Tìm kết quả từ admin cho phiên này
+    // Tìm cả sessionId chính xác và các sessionId cũ hơn trong cùng một phút
+    const sessionStart = new Date(parseInt(sessionId.slice(0, 2)) + 2000, 
+                                parseInt(sessionId.slice(2, 4)) - 1, 
+                                parseInt(sessionId.slice(4, 6)), 
+                                parseInt(sessionId.slice(6, 8)), 
+                                parseInt(sessionId.slice(8, 10)));
+    const sessionEnd = new Date(sessionStart.getTime() + 60000); // Thêm 1 phút
+
     const adminResult = await db.collection('admin_trades').findOne({
-      sessionId,
-      status: 'completed'
+      $or: [
+        { sessionId },
+        {
+          startTime: {
+            $gte: sessionStart.toISOString(),
+            $lt: sessionEnd.toISOString()
+          },
+          status: 'completed'
+        }
+      ]
     });
 
     if (!adminResult) {

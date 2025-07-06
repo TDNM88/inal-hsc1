@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getMongoDb } from '@/lib/db';
 import { getToken } from 'next-auth/jwt';
+import { authConfig } from '@/auth.config';
 import { NextRequest } from 'next/server';
+import { parseSessionId } from '@/lib/sessionUtils';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = await getToken({ req: request });
+    const token = await getToken({ 
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET
+    });
     if (!token) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
@@ -57,7 +62,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = await getToken({ req: request });
+    const token = await getToken({ 
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET
+    });
     if (!token) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
@@ -65,10 +73,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { sessionId, result, startTime, endTime, status } = body;
+    const sessionData = await request.json();
+    let { sessionId, result: tradeResult, startTime, endTime, status } = sessionData;
+    
+    // Nếu không có sessionId, tạo mới dựa trên thời gian hiện tại
+    if (!sessionId && status === 'active') {
+      const now = new Date();
+      const year = now.getFullYear().toString().slice(-2);
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const day = now.getDate().toString().padStart(2, '0');
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      sessionId = `${year}${month}${day}${hours}${minutes}`;
+      
+      // Cập nhật lại thời gian nếu cần
+      if (!startTime) startTime = now.toISOString();
+      if (!endTime) endTime = new Date(now.getTime() + 60000).toISOString(); // Thêm 1 phút
+    }
 
-    if (!sessionId || !result || !startTime || !endTime || !status) {
+    if (!sessionId || !tradeResult || !startTime || !endTime || !status) {
       return NextResponse.json(
         { success: false, message: 'Missing required fields' },
         { status: 400 }
@@ -82,28 +105,22 @@ export async function POST(request: NextRequest) {
 
     // Check if session already exists
     const existingSession = await db.collection('admin_trades').findOne({ sessionId });
-    
+    let dbResult;
+
     if (existingSession) {
       // Update existing session
-      await db.collection('admin_trades').updateOne(
+      dbResult = await db.collection('admin_trades').updateOne(
         { sessionId },
-        { 
-          $set: { 
-            result,
-            status,
-            endTime: new Date(endTime),
-            updatedAt: new Date()
-          } 
-        }
+        { $set: { result: tradeResult, startTime, endTime, status } }
       );
     } else {
       // Create new session
-      await db.collection('admin_trades').insertOne({
+      dbResult = await db.collection('admin_trades').insertOne({
         sessionId,
-        result,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
-        status: status || 'completed',
+        result: tradeResult,
+        startTime,
+        endTime,
+        status,
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -111,7 +128,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Trading session saved successfully'
+      data: {
+        sessionId,
+        result: tradeResult,
+        startTime,
+        endTime,
+        status
+      }
     });
 
   } catch (error) {

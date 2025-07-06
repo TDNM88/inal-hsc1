@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
 import { useToast } from "@/components/ui/use-toast";
+import { generateSessionId } from '@/lib/sessionUtils';
 import { Loader2, AlertCircle, RefreshCw, ArrowDown, ArrowUp, ChevronDown, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -31,7 +32,7 @@ interface TradeResult {
   amount?: number;
 }
 
-const QUICK_AMOUNTS = [50000, 100000, 200000, 500000, 1000000, 2000000, 5000000, 10000000];
+const QUICK_AMOUNTS = [100000, 1000000, 5000000, 10000000, 30000000, 50000000, 100000000, 200000000];
 const SESSION_DURATION = 60; // 60 seconds per session
 const RESULT_DELAY = 5; // 5 seconds delay for result
 
@@ -54,7 +55,13 @@ export default function TradePage() {
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(1000000); // Initial balance for demo
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryRecord[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>('');
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
+    // Khởi tạo sessionId khi component mount
+    if (typeof window !== 'undefined') {
+      return generateSessionId();
+    }
+    return '';
+  });
   const [timeLeft, setTimeLeft] = useState<number>(SESSION_DURATION);
   const [amount, setAmount] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,11 +76,6 @@ export default function TradePage() {
       toast({ variant: 'destructive', title: 'Vui lòng đăng nhập để sử dụng tính năng này' });
       return;
     }
-
-    const generateSessionId = () => {
-      const now = new Date();
-      return `SES-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Math.floor(now.getTime() / (SESSION_DURATION * 1000))}`;
-    };
 
     const startNewSession = () => {
       setCurrentSessionId(generateSessionId());
@@ -96,6 +98,34 @@ export default function TradePage() {
 
     return () => clearInterval(timer);
   }, [authLoading, user, router, toast]);
+
+  // Update session ID when minute changes
+  useEffect(() => {
+    const updateSessionId = () => {
+      const now = new Date();
+      const newSessionId = generateSessionId(now);
+      
+      // Chỉ cập nhật nếu sessionId thay đổi (mỗi phút)
+      if (newSessionId !== currentSessionId) {
+        setCurrentSessionId(newSessionId);
+        
+        // Reset các trạng thái liên quan khi session mới bắt đầu
+        setTradeResult({ status: 'idle' });
+        setTradeHistory(prev => prev.map(trade => 
+          trade.sessionId === newSessionId ? trade : 
+          { ...trade, status: 'completed' as const }
+        ));
+      }
+    };
+    
+    // Update immediately
+    updateSessionId();
+    
+    // Then check every second
+    const interval = setInterval(updateSessionId, 1000);
+    
+    return () => clearInterval(interval);
+  }, [currentSessionId]);
 
   // Track which trades have been processed to prevent duplicate updates
   const processedTradesRef = useRef<Set<string>>(new Set());

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { generateSessionId, parseSessionId } from '@/lib/sessionUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -35,16 +36,6 @@ export function TradingSessionsPage({ token }: { token: string }) {
   const [countdown, setCountdown] = useState(60);
   const [currentPage, setCurrentPage] = useState(1);
   const sessionsPerPage = 10;
-
-  // Generate session ID based on current date and time
-  const generateSessionId = (date: Date) => {
-    const year = date.getFullYear().toString().slice(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${year}${month}${day}${hours}${minutes}`;
-  };
 
   // Save session result to database
   const saveSessionResult = async (session: Session) => {
