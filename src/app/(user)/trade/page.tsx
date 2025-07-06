@@ -45,7 +45,7 @@ const formatAmount = (value: string): string => {
 };
 
 export default function TradePage() {
-  const { user, loading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
@@ -64,7 +64,7 @@ export default function TradePage() {
 
   // Generate session ID and manage session timing
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       router.replace('/auth/login');
       toast({ variant: 'destructive', title: 'Vui lòng đăng nhập để sử dụng tính năng này' });
       return;
@@ -95,10 +95,54 @@ export default function TradePage() {
     setIsLoading(false);
 
     return () => clearInterval(timer);
-  }, [loading, user, router, toast]);
+  }, [authLoading, user, router, toast]);
 
   // Track which trades have been processed to prevent duplicate updates
   const processedTradesRef = useRef<Set<string>>(new Set());
+
+  // Get trade result from admin API
+  const getAdminResult = async (sessionId: string): Promise<'UP' | 'DOWN' | null> => {
+    try {
+      const response = await fetch(`/api/trades/admin-result?sessionId=${sessionId}`);
+      const data = await response.json();
+      
+      if (data.success && data.result) {
+        return data.result as 'UP' | 'DOWN';
+      }
+      return null;
+    } catch (error) {
+      console.error('Lỗi khi lấy kết quả từ admin:', error);
+      return null;
+    }
+  };
+
+  // Save trade result to database
+  const saveTradeResult = async (tradeId: string, result: 'win' | 'lose', profit: number) => {
+    try {
+      const response = await fetch('/api/trades/result', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tradeId,
+          result,
+          profit,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Lỗi khi lưu kết quả giao dịch');
+      }
+    } catch (error) {
+      console.error('Lỗi khi lưu kết quả giao dịch:', error);
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể lưu kết quả giao dịch. Vui lòng thử lại.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Handle trade results after session ends
   useEffect(() => {
@@ -117,36 +161,48 @@ export default function TradePage() {
     // Mark these trades as being processed
     pendingTrades.forEach(trade => processedTradesRef.current.add(trade.id));
 
-    const timeout = setTimeout(() => {
-      setTradeHistory(prev => {
-        return prev.map(trade => {
-          if (pendingTrades.some(t => t.id === trade.id)) {
-            // Simulate admin result (UP or DOWN) for each trade
-            const adminResult = Math.random() > 0.5 ? 'UP' : 'DOWN';
-            const isWin = trade.direction === adminResult;
-            const profit = isWin ? trade.amount * 1.9 : 0;
-            
-            // Update balance for each completed trade
-            setBalance(bal => bal + profit);
-            
-            // Show result toast for each completed trade
-            setTradeResult({
-              status: isWin ? 'win' : 'lose',
-              direction: trade.direction,
-              profit,
-              amount: trade.amount,
-            });
-
-            return {
-              ...trade,
-              status: 'completed' as const,
-              result: isWin ? 'win' as const : 'lose' as const,
-              profit
-            };
-          }
-          return trade;
+    const timeout = setTimeout(async () => {
+      // Process each trade result
+      for (const trade of pendingTrades) {
+        // Get result from admin
+        const adminResult = await getAdminResult(trade.sessionId);
+        
+        if (!adminResult) {
+          console.error(`Không tìm thấy kết quả cho phiên ${trade.sessionId}`);
+          continue; // Skip this trade if no admin result
+        }
+        
+        const isWin = trade.direction === adminResult;
+        const profit = isWin ? Math.floor(trade.amount * 0.9) : 0; // 90% payout
+        
+        // Save result to database
+        await saveTradeResult(trade.id, isWin ? 'win' : 'lose', profit);
+        
+        // Update local state
+        setTradeHistory(prev => 
+          prev.map(t => 
+            t.id === trade.id 
+              ? {
+                  ...t,
+                  status: 'completed',
+                  result: isWin ? 'win' : 'lose',
+                  profit,
+                }
+              : t
+          )
+        );
+        
+        // Update balance
+        setBalance(bal => bal + profit);
+        
+        // Show result toast
+        setTradeResult({
+          status: isWin ? 'win' : 'lose',
+          direction: trade.direction,
+          profit,
+          amount: trade.amount,
         });
-      });
+      }
     }, RESULT_DELAY * 1000);
 
     return () => clearTimeout(timeout);
@@ -209,14 +265,14 @@ export default function TradePage() {
 
     toast({
       title: 'Thành công',
-      description: `Đã đặt lệnh ${selectedAction === 'UP' ? 'TĂNG' : 'GIẢM'} thành công`,
+      description: `Đã đặt lệnh ${selectedAction === 'UP' ? 'LÊN' : 'XUỐNG'} thành công`,
     });
 
     setIsSubmitting(false);
   }, [selectedAction, amount, currentSessionId, toast]);
 
   // Loading state
-  if (isLoading || loading) {
+  if (isLoading || authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />

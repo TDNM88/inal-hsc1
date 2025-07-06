@@ -43,19 +43,54 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Clear previous errors and set loading state
     setError("")
     setIsLoading(true)
+    
+    // Basic client-side validation
+    if (!username.trim()) {
+      setError("Vui lòng nhập tên đăng nhập")
+      setIsLoading(false)
+      return
+    }
+    
+    if (!password) {
+      setError("Vui lòng nhập mật khẩu")
+      setIsLoading(false)
+      return
+    }
 
+    console.log('Form submitted, attempting login...')
+    
     try {
       const result = await login(username.trim(), password)
+      console.log('Login result:', result)
 
-      if (result.success) {
-        // Redirect will be handled by useEffect
+      if (result?.success) {
+        console.log('Login successful, checking authentication...')
+        // Small delay to allow state to update
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Force a refresh of the auth state
+        if (isAuthenticated()) {
+          console.log('User is authenticated, redirecting...')
+          if (isAdmin()) {
+            router.push("/admin")
+          } else {
+            router.push(callbackUrl)
+          }
+        } else {
+          console.error('Login was successful but user is not authenticated')
+          setError("Đăng nhập thành công nhưng không thể chuyển hướng. Vui lòng làm mới trang.")
+        }
       } else {
-        setError(result.message || "Đăng nhập thất bại")
+        console.error('Login failed:', result?.message || 'No error message')
+        setError(result?.message || "Đăng nhập thất bại. Vui lòng thử lại.")
       }
     } catch (err) {
-      setError("Lỗi kết nối")
+      console.error('Unexpected error during login:', err)
+      setError("Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại sau.")
     } finally {
       setIsLoading(false)
     }

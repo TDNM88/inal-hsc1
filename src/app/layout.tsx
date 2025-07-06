@@ -13,8 +13,6 @@ export const viewport: Viewport = {
 
 // Minimal metadata configuration
 export const metadata: Metadata = {
-  title: 'Trading Platform',
-  description: 'Nền tảng giao dịch trực tuyến',
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   manifest: '/site.webmanifest',
   other: {

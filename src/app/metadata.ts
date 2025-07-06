@@ -6,12 +6,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Trading Platform',
-  description: 'Nền tảng giao dịch trực tuyến',
+  title: 'BẢN FULL',
+  description: 'NHẬN THANH TOÁN -> XÓA CHỮ THỪA',
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   openGraph: {
-    title: 'Trading Platform',
-    description: 'Nền tảng giao dịch trực tuyến',
+    title: 'BẢN FULL',
+    description: 'NHẬN THANH TOÁN -> XÓA CHỮ THỪA',
     url: process.env.NEXT_PUBLIC_APP_URL,
     siteName: 'Trading Platform',
     locale: 'vi_VN',
