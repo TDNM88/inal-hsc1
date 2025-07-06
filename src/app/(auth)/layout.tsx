@@ -3,9 +3,12 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
+import Header from '@/components/Header';
 
-// Import global React types
-import '@/lib/react-global';
+// Ensure React is available globally
+if (typeof window !== 'undefined') {
+  window.React = window.React || React;
+}
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();

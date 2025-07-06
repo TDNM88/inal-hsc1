@@ -2,7 +2,11 @@
 
 import React from 'react';
 import ClientLayout from './ClientLayout';
-import '@/lib/ensure-react';
+
+// Ensure React is available globally
+if (typeof window !== 'undefined') {
+  window.React = window.React || React;
+}
 
 export default function ClientRootLayout({
   children,
