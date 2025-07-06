@@ -1,21 +1,53 @@
-// This file is required to be at the root of the app directory
-'use client';
-
-// Ensure React is loaded first
-import React from 'react';
-
-// Import other dependencies
+import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import ClientLayout from './ClientLayout';
-import { metadata, viewport } from './metadata';
-
-// Import the React global initializer
-import '@/lib/ensure-react';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export { metadata, viewport };
+export const metadata: Metadata = {
+  title: 'Trading Platform',
+  description: 'Nền tảng giao dịch trực tuyến',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
+  openGraph: {
+    title: 'Trading Platform',
+    description: 'Nền tảng giao dịch trực tuyến',
+    url: process.env.NEXT_PUBLIC_APP_URL,
+    siteName: 'Trading Platform',
+    locale: 'vi_VN',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Trading Platform',
+    description: 'Nền tảng giao dịch trực tuyến',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest',
+  themeColor: '#ffffff',
+  other: {
+    'msapplication-TileColor': '#ffffff',
+  },
+};
 
 export default function RootLayout({
   children,
@@ -23,16 +55,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <meta name="theme-color" content="#ffffff" />
       </head>
-      <body className={`${inter.className} min-h-screen bg-background`}>
-        <ClientLayout>
-          {children}
-        </ClientLayout>
+      <body className={inter.className}>
+        {children}
       </body>
     </html>
   );
