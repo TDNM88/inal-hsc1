@@ -2,13 +2,14 @@
 import { NextResponse } from 'next/server';
 import { getMongoDb } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
-import { Customer } from '@/lib/useCustomers'; // Import the Customer interface
+import { Customer } from '@/lib/useCustomers';
 
 export async function POST(request: Request) {
   try {
     // Parse request body
     const { username, password, email, fullName, phone, bank } = await request.json();
 
+    // Validate required fields
     if (!username || !password) {
       return NextResponse.json(
         { success: false, message: 'Vui lòng nhập đầy đủ thông tin: username và password' },
@@ -32,32 +33,20 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate email format (basic regex)
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { success: false, message: 'Email không hợp lệ' },
-        { status: 400 }
-      );
-    }
-
     // Connect to MongoDB
     const db = await getMongoDb();
     if (!db) {
       throw new Error('Không thể kết nối đến cơ sở dữ liệu');
     }
 
-    // Check if username or email already exists
+    // Check if username already exists
     const existingUser = await db.collection('users').findOne({
-      $or: [
-        { username: username.trim().toLowerCase() },
-        { email: email.trim().toLowerCase() },
-      ],
+      username: username.trim().toLowerCase(),
     });
 
     if (existingUser) {
       return NextResponse.json(
-        { success: false, message: 'Tên đăng nhập hoặc email đã được sử dụng' },
+        { success: false, message: 'Tên đăng nhập đã được sử dụng' },
         { status: 400 }
       );
     }
@@ -69,7 +58,7 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const newUser: Omit<Customer, '_id'> & { password: string } = {
       username: username.trim().toLowerCase(),
-      email: email.trim().toLowerCase(),
+      email: email?.trim().toLowerCase() || '',
       fullName,
       phone,
       balance: {
