@@ -9,10 +9,9 @@ export async function POST(request: Request) {
     // Parse request body
     const { username, password, email, fullName, phone, bank } = await request.json();
 
-    // Validate input
-    if (!username || !password || !email) {
+    if (!username || !password) {
       return NextResponse.json(
-        { success: false, message: 'Vui lòng nhập đầy đủ thông tin: username, email, và password' },
+        { success: false, message: 'Vui lòng nhập đầy đủ thông tin: username và password' },
         { status: 400 }
       );
     }
