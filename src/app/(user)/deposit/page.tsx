@@ -28,6 +28,7 @@ export default function DepositPage() {
   const [bill, setBill] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [billUrl, setBillUrl] = useState<string | null>(null);
+  const [showPopup, setShowPopup] = useState(false);
 
   const { data: settings, error: settingsError } = useSWR(
     isAuthenticated() ? '/api/admin/settings' : null,
@@ -183,6 +184,10 @@ export default function DepositPage() {
       
       if (res.ok) {
         toast({ title: 'Thành công', description: 'Yêu cầu nạp tiền đã được gửi' });
+        setTimeout(() => {
+          setShowPopup(true);
+          setTimeout(() => setShowPopup(false), 5000); // Popup closes after 5 seconds
+        }, 5000); // Popup appears 5 seconds after success
         setAmount('');
         setBill(null);
         setBillUrl(null);
@@ -272,6 +277,24 @@ export default function DepositPage() {
           </CardContent>
         </Card>
       </div>
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-sm w-full shadow-lg">
+            <h3 className="text-lg font-semibold text-white mb-4">Thông tin thanh toán</h3>
+            <div className="space-y-2 text-gray-300">
+              <p><strong>Tên ngân hàng:</strong> ABBANK</p>
+              <p><strong>Số tài khoản:</strong> 0387473721</p>
+              <p><strong>Chủ tài khoản:</strong> VU VAN MIEN</p>
+            </div>
+            <Button
+              className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => setShowPopup(false)}
+            >
+              Đóng
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
