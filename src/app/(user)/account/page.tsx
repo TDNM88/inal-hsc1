@@ -1,729 +1,344 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import Link from 'next/link';
-import { Menu, X, Loader2 } from 'lucide-react';
-import loading from '@/app/(auth)/login/loading';
+import useSWR from 'swr';
+import { Upload as UploadIcon, FileImage } from 'lucide-react';
 
-export default function AccountPage() {
-  const { user, isLoading, logout } = useAuth();
+type Settings = {
+  minDeposit?: number;
+  depositLimits?: {
+    min: number;
+    max: number;
+  };
+  bankDetails?: Array<{
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+  }>;
+};
+
+// Hàm lấy cookie
+function getCookie(name: string): string {
+  if (typeof document === 'undefined') return '';
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || '';
+  return '';
+}
+
+export default function DepositPage() {
+  const { user, logout, isAuthenticated } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
-  
-  // Sử dụng useEffect để đảm bảo chỉ chạy ở phía client
-  const [isClient, setIsClient] = useState(false);
-  
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-  
-  // Sử dụng searchParams một cách an toàn
-  let searchParams: URLSearchParams | null = null;
-  if (typeof window !== 'undefined') {
-    searchParams = new URLSearchParams(window.location.search);
-  }
-  
-  // Xử lý tham số tab từ URL
-  useEffect(() => {
-    if (!isClient) return;
-    
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab');
-    if (tab && ['overview', 'bank', 'verify', 'password'].includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, [isClient]);
-  
-  // Form state cho thông tin ngân hàng
-  const [bankForm, setBankForm] = useState({
-    fullName: '',
-    bankType: 'Ngân hàng',
-    bankName: '',
-    accountNumber: ''
-  });
-  
-  // Form state cho đổi mật khẩu
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [passwordError, setPasswordError] = useState('');
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  
-  const [isSaving, setIsSaving] = useState(false);
-  const [frontIdFile, setFrontIdFile] = useState<File | null>(null);
-  const [backIdFile, setBackIdFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (type === 'front') {
-        setFrontIdFile(file);
-      } else {
-        setBackIdFile(file);
+  const [amount, setAmount] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+
+  const { data: settings, error: settingsError } = useSWR<Settings>(
+    isAuthenticated() ? '/api/admin/settings' : null,
+    async (url: string) => {
+      let authToken = getCookie('token') || '';
+      if (!authToken && typeof window !== 'undefined') {
+        authToken = localStorage.getItem('token') || '';
       }
-    }
-  };
 
-  // Handle file upload
-  const handleUpload = async (type: 'front' | 'back') => {
-    const file = type === 'front' ? frontIdFile : backIdFile;
-    if (!file) return;
-
-    setIsUploading(true);
-    
-    try {
-      const formData = new FormData();
-      formData.append('document', file);
-      formData.append('type', type);
-      
-      // Lấy token từ cookie
-      const authToken = getCookie('token');
       if (!authToken) {
-        throw new Error('Không tìm thấy thông tin xác thực');
+        throw new Error('Authentication required');
       }
-      
-      const res = await fetch('/api/upload', {
-        method: 'POST',
+
+      const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${authToken}`
+          Authorization: `Bearer ${authToken}`,
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+          Expires: '0',
         },
         credentials: 'include',
-        body: formData
       });
-      
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-        // Cập nhật UI sau khi upload thành công
-        if (type === 'front') {
-          setFrontIdFile(null); // Reset file input
-          const input = document.getElementById('frontId') as HTMLInputElement;
-          if (input) input.value = '';
-        } else {
-          setBackIdFile(null); // Reset file input
-          const input = document.getElementById('backId') as HTMLInputElement;
-          if (input) input.value = '';
-        }
-        
-        toast({ 
-          title: 'Thành công', 
-          description: data.message || `Đã tải lên ${type === 'front' ? 'mặt trước' : 'mặt sau'} thành công` 
-        });
-      } else {
-        throw new Error(data.message || 'Có lỗi xảy ra khi tải lên');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể kết nối đến máy chủ' });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-  
-  // Xử lý query parameter tab từ URL
-  useEffect(() => {
-    // Lấy query parameter từ URL
-    const searchParams = new URLSearchParams(window.location.search);
-    const tabParam = searchParams.get('tab');
-    
-    // Nếu có tab parameter và là tab hợp lệ, set activeTab
-    if (tabParam && ['overview', 'bank', 'verify', 'password'].includes(tabParam)) {
-      setActiveTab(tabParam);
-    }
-  }, []);
-  
-  // Load thông tin ngân hàng nếu đã có
-  useEffect(() => {
-    if (user && user.bank) {
-      setBankForm({
-        fullName: user.bank.accountHolder || '',
-        bankType: 'Ngân hàng',
-        bankName: user.bank.name || '',
-        accountNumber: user.bank.accountNumber || ''
-      });
-      
-      // Kiểm tra trạng thái xác minh
-      setIsVerified(user.verification?.verified === true);
-    }
-  }, [user]);
-  
-  // Handle tab selection and close mobile menu when a tab is selected
-  const handleTabSelect = (tab: string) => {
-    setActiveTab(tab);
-    setIsMobileMenuOpen(false);
-  };
-  
-  // Handle form input changes
-  const handleBankFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setBankForm(prev => ({ ...prev, [name]: value }));
-  };
-  
-  // Xử lý đổi mật khẩu
-  const handleChangePassword = async () => {
-    // Kiểm tra dữ liệu đầu vào
-    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      setPasswordError('Vui lòng điền đầy đủ thông tin');
-      return;
-    }
-
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError('Mật khẩu mới và xác nhận mật khẩu không khớp');
-      return;
-    }
-
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordError('Mật khẩu phải có ít nhất 6 ký tự');
-      return;
-    }
-
-    try {
-      setIsUpdatingPassword(true);
-      setPasswordError('');
-
-      // Lấy token từ cookie
-      const authToken = getCookie('token');
-      if (!authToken) {
-        throw new Error('Không tìm thấy thông tin xác thực');
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword
-        })
-      });
-
-      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Đổi mật khẩu thất bại');
-      }
-
-      // Đặt lại form và hiển thị thông báo thành công
-      setPasswordForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-
-      toast({
-        title: 'Thành công',
-        description: 'Đổi mật khẩu thành công',
-        variant: 'default'
-      });
-
-    } catch (error) {
-      console.error('Lỗi khi đổi mật khẩu:', error);
-      setPasswordError(error instanceof Error ? error.message : 'Đã xảy ra lỗi khi đổi mật khẩu');
-    } finally {
-      setIsUpdatingPassword(false);
-    }
-  };
-  
-  // Hàm lấy cookie - cải tiến để xử lý trường hợp chạy trên server
-  const getCookie = (name: string): string | null => {
-    if (typeof document === 'undefined') {
-      // Nếu đang chạy phía server, trả về null
-      console.log('Running on server, cannot access document.cookie');
-      return null;
-    }
-    
-    try {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      const cookieValue = parts.length === 2 ? parts.pop()?.split(';').shift() || null : null;
-      
-      console.log(`Cookie '${name}':`, cookieValue ? 'Found' : 'Not found');
-      return cookieValue;
-    } catch (error) {
-      console.error('Error accessing cookie:', error);
-      return null;
-    }
-  };
-
-  // Submit bank information
-  const handleSubmitBankInfo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate form
-    if (!bankForm.fullName || !bankForm.bankName || !bankForm.accountNumber) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng nhập đầy đủ thông tin' });
-      return;
-    }
-    
-    // Lấy token từ các nguồn khác nhau
-    let authToken = '';
-    
-    // 1. Thử lấy từ cookie
-    authToken = getCookie('token') || '';
-    console.log('Auth token from cookie:', authToken ? 'Found' : 'Not found');
-    
-    // 2. Nếu không có trong cookie, thử lấy từ localStorage
-    if (!authToken && typeof window !== 'undefined') {
-      authToken = localStorage.getItem('token') || '';
-      console.log('Auth token from localStorage:', authToken ? 'Found' : 'Not found');
-    }
-    
-    // 3. Nếu vẫn không có token, kiểm tra xem có trong URL không (cho trường hợp OAuth)
-    if (!authToken && typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      const tokenFromUrl = url.searchParams.get('token');
-      if (tokenFromUrl) {
-        authToken = tokenFromUrl;
-        console.log('Found token in URL');
-      }
-    }
-    
-    console.log('Auth token:', authToken ? 'Token exists' : 'No token found');
-    
-    if (!authToken) {
-      console.error('No auth token found in cookies or context');
-      toast({ 
-        variant: 'destructive', 
-        title: 'Lỗi xác thực', 
-        description: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' 
-      });
-      // Chuyển hướng về trang đăng nhập sau 2 giây
-      setTimeout(() => {
-        router.push('/login');
-      }, 2000);
-      return;
-    }
-    
-    setIsSaving(true);
-    
-    try {
-      const requestBody = {
-        accountHolder: bankForm.fullName,
-        name: bankForm.bankName,
-        accountNumber: bankForm.accountNumber
-      };
-      
-      console.log('Sending request to /api/users/bank-info with:', requestBody);
-      
-      // Chuẩn bị headers
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-      
-      // Thêm Authorization header nếu có token
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-      
-      // Lưu thông tin ngân hàng
-      const response = await fetch('/api/users/bank-info', {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify(requestBody),
-      });
-      
-      const data = await response.json().catch(e => {
-        console.error('Error parsing JSON response:', e);
-        return { message: 'Lỗi khi xử lý phản hồi từ máy chủ' };
-      });
-      
-      console.log('Response from server:', {
-        status: response.status,
-        statusText: response.statusText,
-        data
-      });
-      
-      if (response.ok) {
-        toast({ 
-          title: 'Thành công', 
-          description: 'Thông tin ngân hàng đã được cập nhật',
-          variant: 'default'
-        });
-        
-        // Cập nhật thông tin người dùng hiện tại
-        if (user) {
-          const updatedUser = { ...user };
-          updatedUser.bank = {
-            name: bankForm.bankName,
-            accountHolder: bankForm.fullName,
-            accountNumber: bankForm.accountNumber,
-            // verified được quản lý bởi verification ở cấp user
-          };
-          // Có thể cập nhật context/state người dùng ở đây nếu cần
+        if (response.status === 401) {
+          await logout();
+          router.push('/login');
+          throw new Error('Session expired');
         }
-      } else {
-        throw new Error(data.message || 'Không thể cập nhật thông tin');
+        throw new Error('Failed to load settings');
       }
-    } catch (error) {
-      console.error('Lỗi khi cập nhật thông tin ngân hàng:', error);
-      toast({ 
-        variant: 'destructive', 
-        title: 'Lỗi', 
-        description: error instanceof Error ? error.message : 'Không thể kết nối đến máy chủ' 
-      });
-      
-      // Nếu lỗi 401, chuyển hướng đến trang đăng nhập
-      if (error instanceof Error && error.message.includes('401')) {
-        router.push('/login');
-      }
-    } finally {
-      setIsSaving(false);
+
+      return response.json();
     }
-  };
+  );
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!isAuthenticated()) {
       toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng đăng nhập' });
       router.push('/login');
     }
-  }, [user, loading, router, toast]);
+    if (settingsError) {
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể tải cài đặt' });
+    }
+  }, [user, isAuthenticated, router, settingsError, toast]);
 
-  if (loading()) {
-    return <div className="flex justify-center items-center h-[60vh] text-gray-400">Đang tải...</div>;
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  // Định dạng ngày đăng ký
-  const formatDate = (dateString: string | Date | undefined): string => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      setPreviewUrl(URL.createObjectURL(selectedFile));
+    }
   };
 
-return (
-    <div className="min-h-[90vh] bg-[#0F1924] text-white flex flex-col md:flex-row">
-      {/* Mobile menu button */}
-      <div className="flex items-center justify-between p-4 md:hidden border-b border-gray-800">
-        <h1 className="text-xl font-bold">Tài khoản</h1>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="text-white hover:bg-blue-900"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </Button>
-      </div>
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    if (!amount) {
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng nhập số tiền' });
+      return;
+    }
+
+    if (!file) {
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng tải lên ảnh xác nhận giao dịch' });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Kích thước ảnh tối đa là 5MB' });
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Chỉ chấp nhận file ảnh định dạng JPG, JPEG hoặc PNG' });
+      return;
+    }
+
+    if (settings && Number(amount) < (settings.minDeposit || 0)) {
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: `Số tiền nạp tối thiểu là ${(settings.minDeposit || 0).toLocaleString()} đ`,
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      let authToken = getCookie('token') || '';
+      if (!authToken && typeof window !== 'undefined') {
+        authToken = localStorage.getItem('token') || '';
+      }
+
+      if (!authToken) {
+        throw new Error('Vui lòng đăng nhập lại');
+      }
+
+      const formData = new FormData();
+      formData.append('amount', amount);
+      formData.append('bill', file);
+
+      // Add CSRF token if needed
+      const csrfToken = getCookie('csrf-token') || '';
       
-      {/* Menu bên trái - hidden on mobile unless toggled */}
-      <div className={`${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex w-full md:w-[250px] flex-col space-y-1 p-4 md:border-r border-gray-800`}>
-        <Button
-          variant="link"
-          className={`justify-start px-4 py-2 ${activeTab === 'overview' ? 'bg-blue-600 text-white' : 'text-white hover:bg-blue-900'}`}
-          onClick={() => handleTabSelect('overview')}
-        >
-          Tổng quan
-        </Button>
-        <Button
-          variant="link"
-          className={`justify-start px-4 py-2 ${activeTab === 'bank' ? 'bg-blue-600 text-white' : 'text-white hover:bg-blue-900'}`}
-          onClick={() => handleTabSelect('bank')}
-        >
-          Thông tin ngân hàng
-        </Button>
-        <Button
-          variant="link"
-          className={`justify-start px-4 py-2 ${activeTab === 'verify' ? 'bg-blue-600 text-white' : 'text-white hover:bg-blue-900'}`}
-          onClick={() => handleTabSelect('verify')}
-        >
-          Xác minh danh tính
-        </Button>
-        <Button
-          variant="link"
-          className={`justify-start px-4 py-2 ${activeTab === 'password' ? 'bg-blue-600 text-white' : 'text-white hover:bg-blue-900'}`}
-          onClick={() => handleTabSelect('password')}
-        >
-          Thay đổi mật khẩu
-        </Button>
+      const res = await fetch('/api/deposits', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'X-CSRF-Token': csrfToken,
+          // Let the browser set the Content-Type with boundary
+        },
+        credentials: 'include',
+        body: formData,
+      });
+
+      // Handle different response statuses
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Có lỗi xảy ra khi gửi yêu cầu');
+      }
+
+      const result = await res.json();
+
+      if (res.ok) {
+        toast({ 
+          title: 'Thành công', 
+          description: 'Yêu cầu nạp tiền đã được gửi. Vui lòng chờ xác nhận từ quản trị viên.' 
+        });
+        setAmount('');
+        setFile(null);
+        setPreviewUrl(null);
+        const fileInput = document.getElementById('bill') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+        
+        setShowPopup(true);
+        setTimeout(() => {
+          setShowPopup(false);
+        }, 10000);
+      } else {
+        throw new Error(result.message || 'Có lỗi xảy ra');
+      }
+    } catch (err) {
+      console.error('Submit error:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: err instanceof Error ? err.message : 'Không thể gửi yêu cầu. Vui lòng thử lại sau.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isAuthenticated()) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+        <div className="text-center">
+          <p>Vui lòng đăng nhập để tiếp tục</p>
+          <Button 
+            onClick={() => router.push('/login')} 
+            className="mt-4 bg-blue-600 hover:bg-blue-700"
+          >
+            Đi đến trang đăng nhập
+          </Button>
+        </div>
       </div>
+    );
+  }
 
-      {/* Khu vực thông tin chính */}
-      <div className="flex-1 p-4 md:p-6">
-        {activeTab === 'overview' && (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-xl font-medium mb-4">tdnm</h2>
-              <p className="text-gray-400">ID: {user.id || '69934'}</p>
-              <p className="text-gray-400">Ngày đăng ký: {formatDate(user.createdAt) || '24/06/2025 12:37'}</p>
-              <div className="mt-2">
-                <span className="inline-block bg-orange-600 text-white text-xs px-3 py-1 rounded">
-                  Chưa xác minh
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg mb-2">Tổng tài sản quy đổi</h3>
-              <p className="text-3xl font-bold">{user.balance?.available?.toLocaleString() || '0'}VND</p>
-              
-              <div className="mt-4 flex space-x-2">
-                <Button 
-                  className="bg-green-600 hover:bg-green-700 text-white" 
-                  onClick={() => router.push('/deposit')}
-                >
-                  Nạp tiền
-                </Button>
-                <Button 
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => router.push('/withdraw')}
-                >
-                  Rút tiền
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg mb-3">Danh sách tài sản</h3>
-              <div className="border-b border-gray-700 pb-2 mb-2 flex justify-between">
-                <span className="text-gray-400">Bank</span>
-                <span className="text-gray-400">Có sẵn</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span>Ngân hàng</span>
-                <span>{user.balance?.available?.toLocaleString() || '0'}VND</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'bank' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-xl font-medium">Thông tin ngân hàng</h2>
-              {isVerified && (
-                <span className="bg-green-600 text-white text-xs px-3 py-1 rounded">
-                  Đã xác minh
-                </span>
-              )}
-            </div>
-            
-            {isVerified ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-400 mb-1">Họ tên</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                    value={bankForm.fullName} 
-                    readOnly 
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1">Loại</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                    value={bankForm.bankType} 
-                    readOnly 
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1">Ngân hàng</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                    value={bankForm.bankName} 
-                    readOnly 
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1">Số tài khoản</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                    value={bankForm.accountNumber} 
-                    readOnly 
-                  />
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitBankInfo} className="space-y-4">
-                <div>
-                  <label className="block text-gray-400 mb-1">Họ tên <span className="text-red-500">*</span></label>
-                  <input 
-                    type="text" 
-                    name="fullName"
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                    value={bankForm.fullName}
-                    onChange={handleBankFormChange}
-                    placeholder="Nhập tên, vui lòng nhập thêm khoảng cách cho mỗi từ"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1">Loại <span className="text-red-500">*</span></label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                    value="Ngân hàng"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1">Ngân hàng <span className="text-red-500">*</span></label>
-                  <input 
-                    type="text" 
-                    name="bankName"
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                    value={bankForm.bankName}
-                    onChange={handleBankFormChange}
-                    placeholder="Nhập tên ngân hàng"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 mb-1">Số tài khoản <span className="text-red-500">*</span></label>
-                  <input 
-                    type="text" 
-                    name="accountNumber"
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                    value={bankForm.accountNumber}
-                    onChange={handleBankFormChange}
-                    placeholder="Nhập số tài khoản ngân hàng của bạn"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-md transition-colors"
-                  disabled={isSaving}
-                >
-                  {isSaving ? 'Đang xử lý...' : 'Xác nhận'}
-                </button>
-                
-                <div className="mt-4 bg-orange-100 border-l-4 border-orange-500 text-orange-800 p-3">
-                  <p className="text-sm">Thông tin ngân hàng là bắt buộc để thực hiện lệnh rút tiền.</p>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'verify' && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium mb-4">Xác minh danh tính</h2>
-            <p className="text-gray-300">Vui lòng tải lên các giấy tờ tùy thân để xác minh danh tính của bạn</p>
-            <div className="grid grid-cols-1 gap-4 mt-4 max-w-2xl mx-auto">
+  return (
+    <div id="deposit-page" className="min-h-screen bg-gray-900 py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        <Card className="bg-gray-800 border-gray-700 shadow-lg rounded-xl">
+          <CardHeader className="border-b border-gray-700 p-6">
+            <CardTitle className="text-2xl font-semibold text-white">Nạp tiền</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-gray-400 mb-1">CMND/CCCD mặt trước</label>
-                <div className="border-2 border-dashed border-gray-700 p-6 rounded-lg text-center">
-                  <p className="text-gray-500">Kéo và thả hoặc click để tải file lên</p>
-                  <input 
-                    id="frontId"
-                    type="file" 
-                    className="hidden" 
-                    onChange={(e) => handleFileChange(e, 'front')}
-                    accept="image/*,.pdf"
-                  />
-                  <Button 
-                    type="button"
-                    className="mt-2 bg-blue-600 hover:bg-blue-700"
-                    onClick={() => document.getElementById('frontId')?.click()}
-                    disabled={isUploading}
+                <Label htmlFor="amount" className="text-gray-400 block mb-2">Số tiền (VND)</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Nhập số tiền cần nạp"
+                  className="bg-gray-700 text-white border-gray-600 focus:border-blue-500 w-full"
+                  min={settings?.minDeposit || 0}
+                  required
+                />
+                {settings && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Số tiền tối thiểu: {(settings.minDeposit || 0).toLocaleString()} đ
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="bill" className="text-gray-400 block mb-2">
+                  Ảnh xác nhận giao dịch
+                </Label>
+                <div className="flex items-center justify-center w-full">
+                  <label
+                    htmlFor="bill"
+                    className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer ${
+                      file ? 'border-green-500' : 'border-gray-600 hover:border-gray-500'
+                    } bg-gray-700 hover:bg-gray-700/50 transition-colors`}
                   >
-                    {isUploading ? 'Đang tải lên...' : 'Chọn file'}
-                  </Button>
-                  {frontIdFile && (
-                    <div className="mt-2 text-sm text-gray-400">
-                      Đã chọn: {frontIdFile.name}
-                      <Button 
-                        type="button"
-                        className="ml-2 bg-green-600 hover:bg-green-700 text-xs py-0 h-6"
-                        onClick={() => handleUpload('front')}
-                        disabled={isUploading}
-                      >
-                        Tải lên
-                      </Button>
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6 px-4 text-center">
+                      {previewUrl ? (
+                        <div className="relative">
+                          <img
+                            src={previewUrl}
+                            alt="Preview"
+                            className="h-20 w-20 object-cover rounded-md mb-2 border border-gray-600"
+                          />
+                          <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                            ✓
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <FileImage className="w-8 h-8 mb-2 text-gray-400" />
+                          <p className="text-sm text-gray-300 mb-1">
+                            <span className="font-medium">Nhấn để tải lên</span> hoặc kéo thả ảnh
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Định dạng: JPG, PNG (tối đa 5MB)
+                          </p>
+                        </>
+                      )}
                     </div>
-                  )}
+                    <input
+                      id="bill"
+                      name="bill"
+                      type="file"
+                      className="hidden"
+                      accept="image/jpeg, image/png, image/jpg"
+                      onChange={handleFileChange}
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </label>
                 </div>
+                {file && (
+                  <div className="mt-2 text-sm text-gray-400">
+                    Đã chọn: <span className="font-medium">{file.name}</span> ({(file.size / 1024).toFixed(2)} KB)
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-gray-400 mb-1">CMND/CCCD mặt sau</label>
-                <div className="border-2 border-dashed border-gray-700 p-6 rounded-lg text-center">
-                  <p className="text-gray-500">Kéo và thả hoặc click để tải file lên</p>
-                  <input 
-                    id="backId"
-                    type="file" 
-                    className="hidden" 
-                    onChange={(e) => handleFileChange(e, 'back')}
-                    accept="image/*,.pdf"
-                  />
-                  <Button 
-                    type="button"
-                    className="mt-2 bg-blue-600 hover:bg-blue-700"
-                    onClick={() => document.getElementById('backId')?.click()}
-                    disabled={isUploading}
-                  >
-                    {isUploading ? 'Đang tải lên...' : 'Chọn file'}
-                  </Button>
-                  {backIdFile && (
-                    <div className="mt-2 text-sm text-gray-400">
-                      Đã chọn: {backIdFile.name}
-                      <Button 
-                        type="button"
-                        className="ml-2 bg-green-600 hover:bg-green-700 text-xs py-0 h-6"
-                        onClick={() => handleUpload('back')}
-                        disabled={isUploading}
-                      >
-                        Tải lên
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {activeTab === 'password' && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium mb-4">Thay đổi mật khẩu</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-400 mb-1">Mật khẩu hiện tại</label>
-                <input 
-                  type="password" 
-                  className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Mật khẩu mới</label>
-                <input 
-                  type="password" 
-                  className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1">Xác nhận mật khẩu mới</label>
-                <input 
-                  type="password" 
-                  className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white" 
-                />
-              </div>
-              <Button className="mt-4 bg-blue-600 hover:bg-blue-700">
-                Cập nhật mật khẩu
+              <Button
+                type="submit"
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-md transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+                disabled={!amount || !file || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Đang xử lý...
+                  </span>
+                ) : (
+                  <span className="flex items-center">
+                    <UploadIcon className="h-5 w-5 mr-2" />
+                    Gửi yêu cầu nạp tiền
+                  </span>
+                )}
               </Button>
-            </div>
-          </div>
-        )}
+            </form>
+          </CardContent>
+        </Card>
       </div>
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-sm w-full shadow-lg">
+            <h3 className="text-lg font-semibold text-white mb-4">Thông tin thanh toán</h3>
+            <div className="space-y-2 text-gray-300">
+              <p><strong>Tên ngân hàng:</strong> ABBANK</p>
+              <p><strong>Số tài khoản:</strong> 0387473721</p>
+              <p><strong>Chủ tài khoản:</strong> VU VAN MIEN</p>
+            </div>
+            <Button
+              className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => setShowPopup(false)}
+            >
+              Đóng
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
