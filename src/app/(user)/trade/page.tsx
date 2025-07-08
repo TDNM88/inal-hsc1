@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
 import { useToast } from "@/components/ui/use-toast";
-import { generateSessionId } from '@/lib/sessionUtils';
 import { Loader2, AlertCircle, RefreshCw, ArrowDown, ArrowUp, ChevronDown, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -17,7 +16,6 @@ import LiquidityTable from '@/components/LiquidityTable';
 const QUICK_AMOUNTS = [100000, 1000000, 5000000, 10000000, 30000000, 50000000, 100000000, 200000000];
 const SESSION_DURATION = 60; // 60 seconds per session
 const RESULT_DELAY = 5; // 5 seconds delay for result
-const TRADING_HOURS = { start: 9, end: 17 }; // Trading from 9:00 to 17:00
 
 // Types
 export interface TradeHistoryRecord {
@@ -47,6 +45,19 @@ const formatAmount = (value: string): string => {
   return isNaN(num) ? '' : num.toLocaleString('vi-VN');
 };
 
+const generateSessionId = (time: Date = new Date()): string => {
+  if (!(time instanceof Date) || isNaN(time.getTime())) {
+    console.error('Invalid Date provided to generateSessionId');
+    return 'INVALID';
+  }
+  const year = String(time.getFullYear()).slice(-2);
+  const month = String(time.getMonth() + 1).padStart(2, '0');
+  const day = String(time.getDate()).padStart(2, '0');
+  const hours = String(time.getHours()).padStart(2, '0');
+  const minutes = String(time.getMinutes()).padStart(2, '0');
+  return `${year}${month}${day}${hours}${minutes}`;
+};
+
 export default function TradePage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
@@ -57,7 +68,7 @@ export default function TradePage() {
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(user?.balance || 1000000); // Initialize with user balance or demo value
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryRecord[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>(() => generateSessionId(new Date()));
+  const [currentSessionId, setCurrentSessionId] = useState<string>(generateSessionId(new Date()));
   const [timeLeft, setTimeLeft] = useState<number>(SESSION_DURATION);
   const [amount, setAmount] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,19 +77,10 @@ export default function TradePage() {
   const [tradeResult, setTradeResult] = useState<TradeResult>({ status: "idle" });
   const processedTradesRef = useRef<Set<string>>(new Set());
 
-  // Check if within trading hours
-  const isWithinTradingHours = (date: Date): boolean => {
-    const hours = date.getHours();
-    return hours >= TRADING_HOURS.start && hours < TRADING_HOURS.end;
-  };
-
   // Generate session timing
   const getSessionTimeRange = (time: Date) => {
     if (!(time instanceof Date) || isNaN(time.getTime())) {
       console.error('Invalid Date provided to getSessionTimeRange');
-      return { startTime: null, endTime: null };
-    }
-    if (!isWithinTradingHours(time)) {
       return { startTime: null, endTime: null };
     }
     const sessionTime = new Date(time);
@@ -96,32 +98,14 @@ export default function TradePage() {
       return;
     }
 
-    const startNewSession = () => {
+    const updateSession = () => {
       const now = new Date();
-      if (!isWithinTradingHours(now)) {
-        setCurrentSessionId('N/A');
-        setTimeLeft(0);
-        return;
-      }
       const newSessionId = generateSessionId(now);
-      setCurrentSessionId(newSessionId);
       const { startTime, endTime } = getSessionTimeRange(now);
-      if (startTime && endTime) {
-        const secondsUntilEnd = Math.floor((endTime.getTime() - now.getTime()) / 1000);
-        setTimeLeft(Math.max(0, secondsUntilEnd));
-      } else {
-        setTimeLeft(0);
-      }
-    };
 
-    startNewSession();
-
-    const timer = setInterval(() => {
-      const now = new Date();
-      if (!isWithinTradingHours(now)) {
+      if (!startTime || !endTime) {
         setCurrentSessionId('N/A');
         setTimeLeft(0);
-        setTradeResult({ status: 'idle' });
         setTradeHistory(prev =>
           prev.map(trade =>
             trade.status === 'pending' ? { ...trade, status: 'completed', result: null, profit: 0 } : trade
@@ -130,7 +114,6 @@ export default function TradePage() {
         return;
       }
 
-      const newSessionId = generateSessionId(now);
       if (newSessionId !== currentSessionId) {
         setCurrentSessionId(newSessionId);
         setTradeResult({ status: 'idle' });
@@ -141,15 +124,14 @@ export default function TradePage() {
               : trade
           )
         );
-        const { startTime, endTime } = getSessionTimeRange(now);
-        if (startTime && endTime) {
-          const secondsUntilEnd = Math.floor((endTime.getTime() - now.getTime()) / 1000);
-          setTimeLeft(Math.max(0, secondsUntilEnd));
-        }
-      } else {
-        setTimeLeft(prev => (prev <= 1 ? SESSION_DURATION : prev - 1));
       }
-    }, 1000);
+
+      const secondsUntilEnd = Math.floor((endTime.getTime() - now.getTime()) / 1000);
+      setTimeLeft(Math.max(0, secondsUntilEnd));
+    };
+
+    updateSession();
+    const timer = setInterval(updateSession, 1000);
 
     setIsLoading(false);
 
@@ -158,7 +140,7 @@ export default function TradePage() {
 
   // Handle trade results after session ends
   useEffect(() => {
-    if (timeLeft !== 0 || !isWithinTradingHours(new Date())) return;
+    if (timeLeft !== 0) return;
 
     const pendingTrades = tradeHistory.filter(
       trade =>
@@ -295,10 +277,10 @@ export default function TradePage() {
       });
       return;
     }
-    if (!isWithinTradingHours(new Date()) || currentSessionId === 'N/A') {
+    if (currentSessionId === 'N/A') {
       toast({
         title: 'Lỗi',
-        description: 'Không thể đặt lệnh ngoài giờ giao dịch (9:00 - 17:00)',
+        description: 'Không thể đặt lệnh khi không có phiên giao dịch',
         variant: 'destructive',
       });
       return;
