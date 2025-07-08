@@ -13,6 +13,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import RightColumn from './RightColumn';
 import LiquidityTable from '@/components/LiquidityTable';
 
+// Constants
+const QUICK_AMOUNTS = [100000, 1000000, 5000000, 10000000, 30000000, 50000000, 100000000, 200000000];
+const SESSION_DURATION = 60; // 60 seconds per session
+const RESULT_DELAY = 5; // 5 seconds delay for result
+const TRADING_HOURS = { start: 9, end: 17 }; // Trading from 9:00 to 17:00
+
 // Types
 export interface TradeHistoryRecord {
   id: string;
@@ -32,16 +38,12 @@ interface TradeResult {
   amount?: number;
 }
 
-const QUICK_AMOUNTS = [100000, 1000000, 5000000, 10000000, 30000000, 50000000, 100000000, 200000000];
-const SESSION_DURATION = 60; // 60 seconds per session
-const RESULT_DELAY = 5; // 5 seconds delay for result
-
 const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 };
 
 const formatAmount = (value: string): string => {
-  const num = parseFloat(value);
+  const num = parseFloat(value.replace(/,/g, ""));
   return isNaN(num) ? '' : num.toLocaleString('vi-VN');
 };
 
@@ -49,27 +51,44 @@ export default function TradePage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  
+
   // State
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [balance, setBalance] = useState<number>(1000000); // Initial balance for demo
+  const [balance, setBalance] = useState<number>(user?.balance || 1000000); // Initialize with user balance or demo value
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryRecord[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
-    // Khởi tạo sessionId khi component mount
-    if (typeof window !== 'undefined') {
-      return generateSessionId();
-    }
-    return '';
-  });
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => generateSessionId(new Date()));
   const [timeLeft, setTimeLeft] = useState<number>(SESSION_DURATION);
   const [amount, setAmount] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedAction, setSelectedAction] = useState<"UP" | "DOWN" | null>(null);
   const [tradeResult, setTradeResult] = useState<TradeResult>({ status: "idle" });
+  const processedTradesRef = useRef<Set<string>>(new Set());
 
-  // Generate session ID and manage session timing
+  // Check if within trading hours
+  const isWithinTradingHours = (date: Date): boolean => {
+    const hours = date.getHours();
+    return hours >= TRADING_HOURS.start && hours < TRADING_HOURS.end;
+  };
+
+  // Generate session timing
+  const getSessionTimeRange = (time: Date) => {
+    if (!(time instanceof Date) || isNaN(time.getTime())) {
+      console.error('Invalid Date provided to getSessionTimeRange');
+      return { startTime: null, endTime: null };
+    }
+    if (!isWithinTradingHours(time)) {
+      return { startTime: null, endTime: null };
+    }
+    const sessionTime = new Date(time);
+    sessionTime.setSeconds(1, 0);
+    const startTime = new Date(sessionTime);
+    const endTime = new Date(sessionTime.getTime() + (SESSION_DURATION * 1000 - 1)); // End at hh:mm:59
+    return { startTime, endTime };
+  };
+
+  // Session and timing management
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace('/auth/login');
@@ -78,154 +97,112 @@ export default function TradePage() {
     }
 
     const startNewSession = () => {
-      setCurrentSessionId(generateSessionId());
-      setTimeLeft(SESSION_DURATION);
+      const now = new Date();
+      if (!isWithinTradingHours(now)) {
+        setCurrentSessionId('N/A');
+        setTimeLeft(0);
+        return;
+      }
+      const newSessionId = generateSessionId(now);
+      setCurrentSessionId(newSessionId);
+      const { startTime, endTime } = getSessionTimeRange(now);
+      if (startTime && endTime) {
+        const secondsUntilEnd = Math.floor((endTime.getTime() - now.getTime()) / 1000);
+        setTimeLeft(Math.max(0, secondsUntilEnd));
+      } else {
+        setTimeLeft(0);
+      }
     };
 
     startNewSession();
 
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          startNewSession();
-          return SESSION_DURATION;
+      const now = new Date();
+      if (!isWithinTradingHours(now)) {
+        setCurrentSessionId('N/A');
+        setTimeLeft(0);
+        setTradeResult({ status: 'idle' });
+        setTradeHistory(prev =>
+          prev.map(trade =>
+            trade.status === 'pending' ? { ...trade, status: 'completed', result: null, profit: 0 } : trade
+          )
+        );
+        return;
+      }
+
+      const newSessionId = generateSessionId(now);
+      if (newSessionId !== currentSessionId) {
+        setCurrentSessionId(newSessionId);
+        setTradeResult({ status: 'idle' });
+        setTradeHistory(prev =>
+          prev.map(trade =>
+            trade.sessionId === currentSessionId && trade.status === 'pending'
+              ? { ...trade, status: 'completed', result: null, profit: 0 }
+              : trade
+          )
+        );
+        const { startTime, endTime } = getSessionTimeRange(now);
+        if (startTime && endTime) {
+          const secondsUntilEnd = Math.floor((endTime.getTime() - now.getTime()) / 1000);
+          setTimeLeft(Math.max(0, secondsUntilEnd));
         }
-        return prev - 1;
-      });
+      } else {
+        setTimeLeft(prev => (prev <= 1 ? SESSION_DURATION : prev - 1));
+      }
     }, 1000);
 
     setIsLoading(false);
 
     return () => clearInterval(timer);
-  }, [authLoading, user, router, toast]);
-
-  // Update session ID when minute changes
-  useEffect(() => {
-    const updateSessionId = () => {
-      const now = new Date();
-      const newSessionId = generateSessionId(now);
-      
-      // Chỉ cập nhật nếu sessionId thay đổi (mỗi phút)
-      if (newSessionId !== currentSessionId) {
-        setCurrentSessionId(newSessionId);
-        
-        // Reset các trạng thái liên quan khi session mới bắt đầu
-        setTradeResult({ status: 'idle' });
-        setTradeHistory(prev => prev.map(trade => 
-          trade.sessionId === newSessionId ? trade : 
-          { ...trade, status: 'completed' as const }
-        ));
-      }
-    };
-    
-    // Update immediately
-    updateSessionId();
-    
-    // Then check every second
-    const interval = setInterval(updateSessionId, 1000);
-    
-    return () => clearInterval(interval);
-  }, [currentSessionId]);
-
-  // Track which trades have been processed to prevent duplicate updates
-  const processedTradesRef = useRef<Set<string>>(new Set());
-
-  // Get trade result from admin API
-  const getAdminResult = async (sessionId: string): Promise<'UP' | 'DOWN' | null> => {
-    try {
-      const response = await fetch(`/api/trades/admin-result?sessionId=${sessionId}`);
-      const data = await response.json();
-      
-      if (data.success && data.result) {
-        return data.result as 'UP' | 'DOWN';
-      }
-      return null;
-    } catch (error) {
-      console.error('Lỗi khi lấy kết quả từ admin:', error);
-      return null;
-    }
-  };
-
-  // Save trade result to database
-  const saveTradeResult = async (tradeId: string, result: 'win' | 'lose', profit: number) => {
-    try {
-      const response = await fetch('/api/trades/result', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tradeId,
-          result,
-          profit,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Lỗi khi lưu kết quả giao dịch');
-      }
-    } catch (error) {
-      console.error('Lỗi khi lưu kết quả giao dịch:', error);
-      toast({
-        title: 'Lỗi',
-        description: 'Không thể lưu kết quả giao dịch. Vui lòng thử lại.',
-        variant: 'destructive',
-      });
-    }
-  };
+  }, [authLoading, user, router, toast, currentSessionId]);
 
   // Handle trade results after session ends
   useEffect(() => {
-    if (timeLeft !== 0) return; // Only run when timeLeft is 0 (session ended)
-    
-    // Find all pending trades for the current session that haven't been processed yet
+    if (timeLeft !== 0 || !isWithinTradingHours(new Date())) return;
+
     const pendingTrades = tradeHistory.filter(
-      trade => 
-        trade.status === 'pending' && 
+      trade =>
+        trade.status === 'pending' &&
         trade.sessionId === currentSessionId &&
         !processedTradesRef.current.has(trade.id)
     );
 
     if (pendingTrades.length === 0) return;
 
-    // Mark these trades as being processed
     pendingTrades.forEach(trade => processedTradesRef.current.add(trade.id));
 
     const timeout = setTimeout(async () => {
-      // Process each trade result
       for (const trade of pendingTrades) {
-        // Get result from admin
         const adminResult = await getAdminResult(trade.sessionId);
-        
         if (!adminResult) {
-          console.error(`Không tìm thấy kết quả cho phiên ${trade.sessionId}`);
-          continue; // Skip this trade if no admin result
+          console.error(`No result for session ${trade.sessionId}`);
+          setTradeHistory(prev =>
+            prev.map(t =>
+              t.id === trade.id
+                ? { ...t, status: 'completed', result: null, profit: 0 }
+                : t
+            )
+          );
+          continue;
         }
-        
+
         const isWin = trade.direction === adminResult;
-        const profit = isWin ? Math.floor(trade.amount * 0.9) : 0; // 90% payout
-        
-        // Save result to database
+        const profit = isWin ? parseFloat((trade.amount * 0.9).toFixed(2)) : 0;
+
         await saveTradeResult(trade.id, isWin ? 'win' : 'lose', profit);
-        
-        // Update local state
-        setTradeHistory(prev => 
-          prev.map(t => 
-            t.id === trade.id 
-              ? {
-                  ...t,
-                  status: 'completed',
-                  result: isWin ? 'win' : 'lose',
-                  profit,
-                }
+
+        setTradeHistory(prev =>
+          prev.map(t =>
+            t.id === trade.id
+              ? { ...t, status: 'completed', result: isWin ? 'win' : 'lose', profit }
               : t
           )
         );
-        
-        // Update balance
-        setBalance(bal => bal + profit);
-        
-        // Show result toast
+
+        if (isWin) {
+          setBalance(prev => prev + trade.amount + profit);
+        }
+
         setTradeResult({
           status: isWin ? 'win' : 'lose',
           direction: trade.direction,
@@ -238,10 +215,62 @@ export default function TradePage() {
     return () => clearTimeout(timeout);
   }, [timeLeft, currentSessionId, tradeHistory]);
 
+  // Get trade result from admin API (mocked for now)
+  const getAdminResult = async (sessionId: string): Promise<'UP' | 'DOWN' | null> => {
+    try {
+      // Mock result for demo
+      return Math.random() > 0.5 ? 'UP' : 'DOWN';
+      // Uncomment for actual API call
+      /*
+      const response = await fetch(`/api/trades/admin-result?sessionId=${sessionId}`);
+      const data = await response.json();
+      if (data.success && data.result) {
+        return data.result as 'UP' | 'DOWN';
+      }
+      return null;
+      */
+    } catch (error) {
+      console.error('Error fetching admin result:', error);
+      return null;
+    }
+  };
+
+  // Save trade result to database
+  const saveTradeResult = async (tradeId: string, result: 'win' | 'lose', profit: number) => {
+    try {
+      // Mock save for demo
+      console.log(`Saving trade result: tradeId=${tradeId}, result=${result}, profit=${profit}`);
+      // Uncomment for actual API call
+      /*
+      const response = await fetch('/api/trades/result', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tradeId,
+          result,
+          profit,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to save trade result');
+      }
+      */
+    } catch (error) {
+      console.error('Error saving trade result:', error);
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể lưu kết quả giao dịch. Vui lòng thử lại.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Handle amount changes
   const addAmount = useCallback((value: number) => {
     setAmount(prev => {
-      const current = parseFloat(prev) || 0;
+      const current = parseFloat(prev.replace(/,/g, "")) || 0;
       const newAmount = Math.max(100000, current + value);
       return newAmount.toString();
     });
@@ -249,7 +278,7 @@ export default function TradePage() {
 
   // Handle trade action
   const handleAction = useCallback((direction: "UP" | "DOWN") => {
-    const amountValue = parseFloat(amount);
+    const amountValue = parseFloat(amount.replace(/,/g, ""));
     if (!amount || isNaN(amountValue) || amountValue < 100000) {
       toast({
         title: 'Lỗi',
@@ -266,30 +295,39 @@ export default function TradePage() {
       });
       return;
     }
+    if (!isWithinTradingHours(new Date()) || currentSessionId === 'N/A') {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể đặt lệnh ngoài giờ giao dịch (9:00 - 17:00)',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSelectedAction(direction);
     setIsConfirming(true);
-  }, [amount, balance, toast]);
+  }, [amount, balance, currentSessionId, toast]);
 
   // Confirm trade
   const confirmTrade = useCallback(() => {
-    if (!selectedAction || !amount) return;
+    if (!selectedAction || !amount || currentSessionId === 'N/A') return;
 
     setIsSubmitting(true);
     setIsConfirming(false);
 
+    const amountNum = Number(amount.replace(/,/g, ""));
     const newTrade: TradeHistoryRecord = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       sessionId: currentSessionId,
       direction: selectedAction,
-      amount: Number(amount),
+      amount: amountNum,
       status: 'pending',
       result: null,
       profit: 0,
       createdAt: new Date().toISOString(),
     };
 
-    setTradeHistory(prev => [newTrade, ...prev]);
-    setBalance(prev => prev - Number(amount));
+    setTradeHistory(prev => [newTrade, ...prev].slice(0, 30)); // Limit to 30 trades
+    setBalance(prev => prev - amountNum);
     setAmount('');
     setSelectedAction(null);
 
@@ -421,7 +459,7 @@ export default function TradePage() {
               <CardContent className="py-6 px-4">
                 <div className="flex items-center justify-between text-gray-900 text-lg font-semibold uppercase">
                   <span>SỐ DƯ:</span>
-                  <span>{formatCurrency(balance || 0)} VND</span>
+                  <span>{formatCurrency(balance || 0)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -444,7 +482,7 @@ export default function TradePage() {
                     <span className="text-xs text-gray-400">Tối thiểu: {formatCurrency(100000)}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="icon" onClick={() => addAmount(-100000)}>
+                    <Button variant="outline" size="icon" onClick={() => addAmount(-100000)} disabled={isSubmitting}>
                       <Minus className="h-4 w-4" />
                     </Button>
                     <Input
@@ -456,8 +494,9 @@ export default function TradePage() {
                         if (/^\d*$/.test(raw)) setAmount(raw);
                       }}
                       placeholder="Nhập số tiền"
+                      disabled={isSubmitting}
                     />
-                    <Button variant="outline" size="icon" onClick={() => addAmount(100000)}>
+                    <Button variant="outline" size="icon" onClick={() => addAmount(100000)} disabled={isSubmitting}>
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -470,6 +509,7 @@ export default function TradePage() {
                         size="sm"
                         className="text-sm font-semibold bg-white hover:bg-gray-100"
                         onClick={() => addAmount(value)}
+                        disabled={isSubmitting}
                       >
                         {value >= 1000000 ? `+${value / 1000000}M` : `+${value / 1000}K`}
                       </Button>
@@ -501,7 +541,7 @@ export default function TradePage() {
                     type="button"
                     className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-bold flex items-center justify-center"
                     onClick={() => handleAction("UP")}
-                    disabled={isLoading || !amount || isSubmitting}
+                    disabled={isLoading || !amount || isSubmitting || currentSessionId === 'N/A'}
                   >
                     LÊN <ArrowUp className="h-5 w-5 ml-2" />
                   </Button>
@@ -509,7 +549,7 @@ export default function TradePage() {
                     type="button"
                     className="w-full h-14 bg-red-600 hover:bg-red-700 text-lg font-bold flex items-center justify-center"
                     onClick={() => handleAction("DOWN")}
-                    disabled={isLoading || !amount || isSubmitting}
+                    disabled={isLoading || !amount || isSubmitting || currentSessionId === 'N/A'}
                   >
                     XUỐNG <ArrowDown className="h-5 w-5 ml-2" />
                   </Button>
