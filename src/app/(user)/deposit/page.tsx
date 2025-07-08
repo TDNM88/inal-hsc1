@@ -227,26 +227,10 @@ export default function DepositPage() {
                     className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
                   />
                 </div>
-                <div>
-                  <Label className="text-gray-400">Số tài khoản</Label>
-                  <Input
-                    value={settings?.accountNumber || ''}
-                    readOnly
-                    className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <Label className="text-gray-400">Chủ tài khoản</Label>
-                  <Input
-                    value={settings?.accountHolder || ''}
-                    readOnly
-                    className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
-                  />
-                </div>
               </div>
             </div>
             <div>
-              <Label className="text-gray-400">Số tiền nạp</Label>
+              <Label className="text-gray-400">Số tiền</Label>
               <Input
                 type="number"
                 value={amount}
@@ -260,43 +244,11 @@ export default function DepositPage() {
                 </p>
               )}
             </div>
-            <div>
-              <Label className="text-gray-400">Tải lên bill chuyển khoản</Label>
-              <div className="space-y-2">
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    disabled={isUploading}
-                    className="bg-gray-700 text-white border-gray-600 focus:border-blue-500 file:bg-gray-600 file:text-white file:hover:bg-gray-500 disabled:opacity-50"
-                  />
-                </div>
-                
-                {isUploading && (
-                  <div className="flex items-center text-sm text-blue-400">
-                    <div className="h-4 w-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Đang tải lên ảnh...
-                  </div>
-                )}
-                
-                {bill && !isUploading && billUrl && (
-                  <div className="text-sm text-green-400">
-                    ✓ Đã tải lên: {bill.name}
-                  </div>
-                )}
-                
-                {bill && !isUploading && !billUrl && (
-                  <div className="text-sm text-yellow-400">
-                    Lỗi khi tải lên. Vui lòng thử lại.
-                  </div>
-                )}
-              </div>
-            </div>
+            
             <Button
               className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-md transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
               onClick={handleSubmit}
-              disabled={!amount || !bill || isUploading || !billUrl}
+              disabled={!amount}
             >
               {isUploading ? (
                 <>
