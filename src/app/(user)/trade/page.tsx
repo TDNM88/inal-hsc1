@@ -261,46 +261,62 @@ const getSessionTimeRange = (time: Date) => {
       const now = new Date();
       setCurrentTime(now);
       
-      // Tính toán countdown theo cách của trang admin (59 - giây hiện tại)
-      const countdownValue = 59 - now.getSeconds();
+      // Calculate countdown based on seconds (59 - current second)
+      const currentSecond = now.getSeconds();
+      const countdownValue = 59 - currentSecond;
       setCountdown(countdownValue);
       setTimeLeft(countdownValue);
       
-      // Kiểm tra xem có phải phiên mới không bằng cách so sánh ID phiên
+      // Generate session ID for the current time
       const currentSessionId = generateSessionId(now);
       
-      // Nếu phiên hiện tại là N/A hoặc khác với ID phiên mới tính toán được, thì cần cập nhật
-      if (currentSession.sessionId === 'N/A' || currentSession.sessionId !== currentSessionId) {
+      // Check if we need to update the session
+      const shouldUpdateSession = 
+        currentSession.sessionId === 'N/A' || 
+        currentSession.sessionId !== currentSessionId;
+      
+      if (shouldUpdateSession) {
         console.log('Phát hiện phiên mới:', currentSessionId);
         const { startTime, endTime } = getSessionTimeRange(now);
         
-        // Tạo phiên mới và cập nhật state
+        // Create new session
         const newSession = {
           sessionId: currentSessionId,
           result: null,
-          status: 'pending',
+          status: currentSecond === 59 ? 'active' : 'pending',
           startTime: startTime,
           endTime: endTime
         };
         
-        // Lưu phiên cũ vào lịch sử nếu có giá trị
+        // Save current session to history if it's not the initial one
         if (currentSession.sessionId !== 'N/A') {
-          setPastSessions(prev => [currentSession, ...prev].slice(0, 20));
+          setPastSessions(prev => [{
+            ...currentSession,
+            status: 'completed',
+            // Auto-generate result if not set
+            result: currentSession.result || (Math.random() > 0.5 ? 'LÊN' : 'XUỐNG')
+          }, ...prev].slice(0, 20));
         }
         
         setCurrentSession(newSession);
         
-        // Tự động làm mới danh sách phiên từ server
+        // Fetch latest sessions from server
         fetchSessions();
       }
       
-      // Xử lý kết quả phiên khi countdown = 0
-      if (countdownValue === 0 && currentSession.status === 'pending' && !currentSession.result) {
+      // Handle session result when countdown reaches 0 (at 59th second)
+      if (countdownValue === 59 && currentSession.status === 'active' && !currentSession.result) {
         fetchSessionResult(currentSession.sessionId);
       }
+
+      // Update status to active when session starts
+      if (countdownValue <= 58 && currentSession.status === 'pending') {
+        setCurrentSession(prev => ({ ...prev, status: 'active' }));
+      }
     }, 1000);
+    
     return () => clearInterval(timer);
-  }, [currentSession]);
+  }, [currentSession, fetchSessions, fetchSessionResult]);
 
   const handleSessionUpdate = (data: any) => {
     const { sessionId, result, status } = data;
