@@ -16,7 +16,7 @@ function getCookie(name: string): string {
   if (typeof document === 'undefined') return '';
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split('').shift() || '';
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || '';
   return '';
 }
 
@@ -28,13 +28,13 @@ export default function DepositPage() {
   const [showPopup, setShowPopup] = useState(false);
 
   const { data: settings, error: settingsError } = useSWR(
-    isAuthenticated() ? '/api/auth/settings' : undefined,
-    async (url: string) => {
-      let authToken = getCookie('token');
+    isAuthenticated() ? '/api/admin/settings' : null,
+    async (url) => {
+      let authToken = getCookie('token') || '';
       if (!authToken && typeof window !== 'undefined') {
         authToken = localStorage.getItem('token') || '';
       }
-      
+
       if (!authToken) {
         throw new Error('Authentication required');
       }
@@ -43,67 +43,68 @@ export default function DepositPage() {
         headers: {
           Authorization: `Bearer ${authToken}`,
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'Expires': '0',
+          Pragma: 'no-cache',
+          Expires: '0',
         },
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           await logout();
-          router.push('/api/auth/login');
+          router.push('/login');
           throw new Error('Session expired');
         }
         throw new Error('Failed to load settings');
       }
-      
+
       return response.json();
     }
   );
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      toast({ variant: 'error', title: 'Error', description: 'Please log in' });
-      router.push('/api/auth');
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng đăng nhập' });
+      router.push('/login');
     }
     if (settingsError) {
-      toast({ variant: 'error', title: 'Error', description: 'Failed to load settings' });
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể tải cài đặt' });
     }
-  }, [user, isAuthenticated, userrouter, settingsError, toast, user]);
+  }, [user, isAuthenticated, router, settingsError, toast]);
 
   const handleSubmit = async () => {
     if (!amount) {
-      toast({ variant: 'error', description: 'Vui lòng nhập số tiền' });
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng nhập số tiền' });
       return;
     }
 
     if (settings && Number(amount) < (settings.minDeposit || 0)) {
       toast({
-        variant: 'error',
+        variant: 'destructive',
+        title: 'Lỗi',
         description: `Số tiền nạp tối thiểu là ${(settings.minDeposit || 0).toLocaleString()} đ`,
       });
       return;
     }
 
     try {
-      let authToken = getCookie('token');
+      let authToken = getCookie('token') || '';
       if (!authToken && typeof window !== 'undefined') {
         authToken = localStorage.getItem('token') || '';
       }
-      
+
       if (!authToken) {
-        throw new Error('Please log in lại');
+        throw new Error('Vui lòng đăng nhập lại');
       }
-      
-      const res = await fetch('/api/auth/deposits', {
+
+      const res = await fetch('/api/deposits', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${authToken}`,
           'Cache-Control': 'no-cache',
-          '  Pragma: 'no-cache',
-          '  Expires: '0',
+          Pragma: 'no-cache',
+          Expires: '0',
         },
         credentials: 'include',
         body: JSON.stringify({
@@ -111,17 +112,13 @@ export default function DepositPage() {
           status: 'pending',
         }),
       });
-      
+
       console.log('API response status:', res.status);
       const result = await res.json();
       console.log('API response:', result);
-      
-      if (!res.ok) {
-        toast({ 
-          variant: 'error', 
-          description: 'Error', 
-          description: 'Yêu cầu nạp tiền đã được gửi' 
-        });
+
+      if (res.ok) {
+        toast({ title: 'Thành công', description: 'Yêu cầu nạp tiền đã được gửi' });
         setTimeout(() => {
           console.log('Showing popup');
           setShowPopup(true);
@@ -132,12 +129,13 @@ export default function DepositPage() {
         }, 5000);
         setAmount('');
       } else {
-        toast({ variant: 'error', description: result.message || 'Có lỗi xảy ra' });
+        toast({ variant: 'destructive', title: 'Lỗi', description: result.message || 'Có lỗi xảy ra' });
       }
     } catch (err) {
       console.error('Submit error:', err);
       toast({
-        variant: 'error',
+        variant: 'destructive',
+        title: 'Lỗi',
         description: 'Không thể gửi yêu cầu. Vui lòng thử lại sau.',
       });
     }
