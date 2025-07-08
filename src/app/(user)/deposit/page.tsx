@@ -97,6 +97,14 @@ export default function DepositPage() {
         throw new Error('Vui lòng đăng nhập lại');
       }
 
+      const depositData = {
+        userId: user?.id, // Assuming user object has an id property
+        username: user?.username, // Assuming user object has a username property
+        amount: Number(amount),
+        status: 'pending',
+        timestamp: new Date().toISOString(),
+      };
+
       const res = await fetch('/api/deposits', {
         method: 'POST',
         headers: {
@@ -107,10 +115,7 @@ export default function DepositPage() {
           Expires: '0',
         },
         credentials: 'include',
-        body: JSON.stringify({
-          amount: Number(amount),
-          status: 'pending',
-        }),
+        body: JSON.stringify(depositData),
       });
 
       console.log('API response status:', res.status);
