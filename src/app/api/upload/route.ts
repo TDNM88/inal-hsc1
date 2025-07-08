@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
 import { uploadFile } from '@/lib/fileUpload';
 import { getMongoDb } from '@/lib/db';
 import { ObjectId } from 'mongodb';
@@ -15,16 +14,7 @@ export const config = {
 // API xử lý upload file
 export async function POST(req: NextRequest) {
   try {
-    // Xác thực người dùng (optional)
-    const token = req.headers.get('authorization')?.split(' ')[1];
-    if (!token) {
-      return NextResponse.json({ message: 'Bạn cần đăng nhập' }, { status: 401 });
-    }
-
-    const authResult = await verifyToken(token);
-    if (!authResult.isValid || !authResult.userId) {
-      return NextResponse.json({ message: 'Token không hợp lệ' }, { status: 401 });
-    }
+    
 
     // Xử lý form data
     const formData = await req.formData();
