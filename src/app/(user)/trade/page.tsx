@@ -119,38 +119,36 @@ export default function TradePage() {
   };
 
   const generateSessionId = (time: Date): string => {
-    // Format: yymmddhhmm (năm-tháng-ngày-giờ-phút)
-    const year = String(time.getFullYear()).slice(-2); // lấy 2 chữ số cuối của năm
-    const month = String(time.getMonth() + 1).padStart(2, '0');
-    const day = String(time.getDate()).padStart(2, '0');
-    const hours = String(time.getHours()).padStart(2, '0');
-    const minutes = String(time.getMinutes()).padStart(2, '0');
-    return `${year}${month}${day}${hours}${minutes}`;
-  };
-  
-  // Hàm tạo thời gian bắt đầu và kết thúc của phiên theo phút hiện tại
-  const getSessionTimeRange = (time: Date) => {
-    const startTime = new Date(
-      time.getFullYear(), 
-      time.getMonth(), 
-      time.getDate(), 
-      time.getHours(), 
-      time.getMinutes(), 
-      0
-    );
-    
-    const endTime = new Date(
-      time.getFullYear(), 
-      time.getMonth(), 
-      time.getDate(), 
-      time.getHours(), 
-      time.getMinutes(), 
-      59
-    );
-    
-    return { startTime, endTime };
-  };
+  // Format: yymmddhhmm (năm-tháng-ngày-giờ-phút)
+  const year = String(time.getFullYear()).slice(-2); // lấy 2 chữ số cuối của năm
+  const month = String(time.getMonth() + 1).padStart(2, '0');
+  const day = String(time.getDate()).padStart(2, '0');
+  const hours = String(time.getHours()).padStart(2, '0');
+  const minutes = String(time.getMinutes()).padStart(2, '0');
+  return `${year}${month}${day}${hours}${minutes}`;
+};
 
+// Hàm tạo thời gian bắt đầu và kết thúc của phiên
+// Mỗi phiên bắt đầu từ giây thứ 1 và kéo dài đúng 1 phút
+const getSessionTimeRange = (time: Date) => {
+  // Tạo bản sao để không ảnh hưởng đến tham số gốc
+  const sessionTime = new Date(time);
+  
+  // Đặt giây về 1 (bắt đầu từ giây thứ 1)
+  sessionTime.setSeconds(1, 0);
+  
+  // Nếu đã qua giây thứ 1, chuyển sang phút tiếp theo
+  if (time.getSeconds() >= 1) {
+    sessionTime.setMinutes(sessionTime.getMinutes() + 1);
+  }
+  
+  const startTime = new Date(sessionTime);
+  // Kết thúc sau đúng 1 phút (60 giây)
+  const endTime = new Date(sessionTime.getTime() + 60000);
+  
+  return { startTime, endTime };
+};
+  
   const handleLogout = () => {
     logout();
     router.push('/login');
