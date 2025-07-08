@@ -216,19 +216,6 @@ export default function DepositPage() {
           </CardHeader>
           <CardContent className="p-6 space-y-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-300 mb-4">Thông tin ngân hàng</h3>
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <Label className="text-gray-400">Tên ngân hàng</Label>
-                  <Input
-                    value={settings?.bankName || 'Đang tải...'}
-                    readOnly
-                    className="bg-gray-700 text-white border-gray-600"
-                  />
-                </div>
-              </div>
-            </div>
-            <div>
               <Label className="text-gray-400">Số tiền</Label>
               <Input
                 type="number"
@@ -243,24 +230,10 @@ export default function DepositPage() {
                 </p>
               )}
             </div>
-            <div>
-              <Label className="text-gray-400">Tải lên bill</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
-              />
-              {bill && (
-                <p className="text-sm text-gray-500 mt-1">
-                  Đã chọn: {bill.name}
-                </p>
-              )}
-            </div>
             <Button
               className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-md transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
               onClick={handleSubmit}
-              disabled={!amount || !bill || isUploading}
+              disabled={!amount}
             >
               {isUploading ? (
                 <>
