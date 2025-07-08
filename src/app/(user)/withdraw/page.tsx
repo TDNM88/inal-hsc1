@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -9,118 +9,276 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import useSWR from 'swr';
+import { Upload } from 'lucide-react';
 
-export default function WithdrawPage() {
-  const { user, token, loading, logout } = useAuth();
+// Hàm lấy cookie
+function getCookie(name: string): string {
+  if (typeof document === 'undefined') return '';
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || '';
+  return '';
+}
+
+export default function DepositPage() {
+  const { user, logout, isAuthenticated } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [amount, setAmount] = useState('');
   const [bankName, setBankName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
+  const [bill, setBill] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [billUrl, setBillUrl] = useState<string | null>(null);
 
   const { data: settings, error: settingsError } = useSWR(
-    token ? '/api/admin/settings' : null,
-    url => fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json())
+    isAuthenticated() ? '/api/admin/settings' : null,
+    async (url) => {
+      let authToken = getCookie('token') || '';
+      if (!authToken && typeof window !== 'undefined') {
+        authToken = localStorage.getItem('token') || '';
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          await logout();
+          router.push('/login');
+          throw new Error('Phiên đăng nhập đã hết hạn');
+        }
+        throw new Error('Không thể tải cài đặt');
+      }
+      
+      return response.json();
+    }
   );
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!isAuthenticated()) {
       toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng đăng nhập' });
       router.push('/login');
     }
-    if (user) {
-      setBankName(user.bank?.name || '');
-      setAccountNumber(user.bank?.accountNumber || '');
+    if (settings?.bankName) {
+      setBankName(settings.bankName);
     }
-  }, [user, loading, router, toast]);
+  }, [user, isAuthenticated, router, toast, settings]);
 
-  const handleSubmit = async () => {
-    if (!amount || !bankName || !accountNumber) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng nhập đầy đủ thông tin' });
-      return;
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setBill(file);
+      handleUploadFile(file);
     }
+  };
 
-    if (settings && (Number(amount) < settings.minWithdrawal || Number(amount) > settings.maxWithdrawal)) {
+  const handleUploadFile = async (file: File) => {
+    setIsUploading(true);
+    setBillUrl(null);
+    
+    try {
+      let authToken = getCookie('token') || '';
+      if (!authToken && typeof window !== 'undefined') {
+        authToken = localStorage.getItem('token') || '';
+      }
+      
+      if (!authToken) {
+        throw new Error('Vui lòng đăng nhập lại');
+      }
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+        credentials: 'include',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          await logout();
+          router.push('/login');
+          throw new Error('Phiên đăng nhập đã hết hạn');
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Upload thất bại');
+      }
+      
+      const data = await response.json();
+      setBillUrl(data.url);
+      toast({
+        title: 'Thành công',
+        description: 'Tải lên ảnh thành công',
+      });
+    } catch (error) {
       toast({
         variant: 'destructive',
         title: 'Lỗi',
-        description: `Số tiền rút phải từ ${settings.minWithdrawal.toLocaleString()} đ đến ${settings.maxWithdrawal.toLocaleString()} đ`,
+        description: error instanceof Error ? error.message : 'Không thể tải lên ảnh. Vui lòng thử lại.',
       });
+      setBill(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!amount || !bankName || !bill) {
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng nhập số tiền, tên ngân hàng và tải lên bill' });
+      return;
+    }
+
+    if (settings && Number(amount) < settings.minDeposit) {
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: `Số tiền nạp tối thiểu là ${settings.minDeposit.toLocaleString()} đ`,
+      });
+      return;
+    }
+
+    if (!billUrl) {
+      toast({ variant: 'destructive', title: 'Lỗi', description: 'Vui lòng đợi ảnh được tải lên hoàn tất' });
       return;
     }
 
     try {
-      const res = await fetch('/api/withdrawals', {
+      let authToken = getCookie('token') || '';
+      if (!authToken && typeof window !== 'undefined') {
+        authToken = localStorage.getItem('token') || '';
+      }
+      
+      if (!authToken) {
+        throw new Error('Vui lòng đăng nhập lại');
+      }
+      
+      const res = await fetch('/api/deposits', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
         },
-        body: JSON.stringify({ amount: Number(amount), bankName, accountNumber }),
+        credentials: 'include',
+        body: JSON.stringify({
+          amount: Number(amount),
+          bankName,
+          bill: billUrl,
+          status: 'pending',
+        }),
       });
+      
       const result = await res.json();
+      
       if (res.ok) {
-        toast({ title: 'Thành công', description: 'Yêu cầu rút tiền đã được gửi' });
+        toast({ title: 'Thành công', description: 'Yêu cầu nạp tiền đã được gửi' });
         setAmount('');
+        setBankName('');
+        setBill(null);
+        setBillUrl(null);
       } else {
-        toast({ variant: 'destructive', title: 'Lỗi', description: result.message });
+        toast({ variant: 'destructive', title: 'Lỗi', description: result.message || 'Có lỗi xảy ra' });
       }
     } catch (err) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: 'Không thể gửi yêu cầu' });
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: 'Không thể gửi yêu cầu. Vui lòng thử lại sau.',
+      });
     }
   };
 
-  if (loading || !user) {
-    return <div className="flex justify-center items-center h-screen text-white">Loading...</div>;
+  if (!isAuthenticated()) {
+    return <div>Vui lòng đăng nhập để tiếp tục</div>;
   }
 
   return (
-    <div className="text-white">
-      <Card className="bg-gray-800 border-gray-700 max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-white">Rút tiền</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <Label className="text-white">Số tiền rút</Label>
-            <Input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Số tiền (VND)"
-              className="bg-gray-700 text-white"
-            />
-          </div>
-          <div>
-            <h3 className="text-lg font-medium text-white mb-4">Thông tin ngân hàng</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-white">Tên ngân hàng</Label>
-                <Input
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                  className="bg-gray-700 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-white">Số tài khoản</Label>
-                <Input
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  className="bg-gray-700 text-white"
-                />
+    <div id="deposit-page" className="min-h-screen bg-gray-900 py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        <Card className="bg-gray-800 border-gray-700 shadow-lg rounded-xl">
+          <CardHeader className="border-b border-gray-700 p-6">
+            <CardTitle className="text-2xl font-semibold text-white">Nạp tiền</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-gray-300 mb-4">Thông tin ngân hàng</h3>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <Label className="text-gray-400">Tên ngân hàng</Label>
+                  <Input
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    placeholder="Nhập tên ngân hàng"
+                    className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
+                  />
+                </div>
               </div>
             </div>
-          </div>
-          <Button
-            className="bg-green-600 hover:bg-green-700"
-            onClick={handleSubmit}
-            disabled={!amount || !bankName || !accountNumber}
-          >
-            Gửi yêu cầu
-          </Button>
-        </CardContent>
-      </Card>
+            <div>
+              <Label className="text-gray-400">Số tiền</Label>
+              <Input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Số tiền (VND)"
+                className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
+              />
+              {settings && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Tối thiểu: {settings.minDeposit.toLocaleString()} đ
+                </p>
+              )}
+            </div>
+            <div>
+              <Label className="text-gray-400">Tải lên bill</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
+              />
+              {bill && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Đã chọn: {bill.name}
+                </p>
+              )}
+            </div>
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-md transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+              onClick={handleSubmit}
+              disabled={!amount || !bankName || !bill || isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-5 w-5 mr-2" />
+                  Gửi yêu cầu
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
