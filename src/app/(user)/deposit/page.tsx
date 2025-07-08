@@ -3,6 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from 'components/ui/card';
+import { Button } from 'components/ui/button';
+import { Input } from 'components/ui/input';
+import { Label } from 'components/ui/label';
+import { useToast } from 'components/ui/use-toast';
+import useSWR from 'swr';
+import { Upload } from 'lucide-react';
 
 // Hàm lấy cookie
 function getCookie(name: string): string {
@@ -12,13 +19,6 @@ function getCookie(name: string): string {
   if (parts.length === 2) return parts.pop()?.split(';').shift() || '';
   return '';
 }
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/use-toast';
-import useSWR from 'swr';
-import { Upload } from 'lucide-react';
 
 export default function DepositPage() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -32,25 +32,23 @@ export default function DepositPage() {
   const { data: settings, error: settingsError } = useSWR(
     isAuthenticated() ? '/api/admin/settings' : null,
     async (url) => {
-      // Lấy token từ cookie hoặc localStorage
       let authToken = getCookie('token') || '';
       if (!authToken && typeof window !== 'undefined') {
         authToken = localStorage.getItem('token') || '';
       }
       
-      const response = await fetch(url, { 
-        headers: { 
-          'Authorization': `Bearer ${authToken}`,
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+          Pragma: 'no-cache',
+          Expires: '0',
         },
-        credentials: 'include'
+        credentials: 'include',
       });
       
       if (!response.ok) {
         if (response.status === 401) {
-          // Token hết hạn, đăng xuất
           await logout();
           router.push('/login');
           throw new Error('Phiên đăng nhập đã hết hạn');
@@ -82,7 +80,6 @@ export default function DepositPage() {
     setBillUrl(null);
     
     try {
-      // Lấy token từ cookie hoặc localStorage
       let authToken = getCookie('token') || '';
       if (!authToken && typeof window !== 'undefined') {
         authToken = localStorage.getItem('token') || '';
@@ -95,14 +92,13 @@ export default function DepositPage() {
       const formData = new FormData();
       formData.append('file', file);
       
-      console.log('Đang tải lên ảnh...');
       const response = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${authToken}`,
+        headers: {
+          Authorization: `Bearer ${authToken}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+          Pragma: 'no-cache',
+          Expires: '0',
         },
         credentials: 'include',
         body: formData,
@@ -119,15 +115,12 @@ export default function DepositPage() {
       }
       
       const data = await response.json();
-      console.log('Upload thành công:', data);
-      
       setBillUrl(data.url);
       toast({
         title: 'Thành công',
         description: 'Tải lên ảnh thành công',
       });
     } catch (error) {
-      console.error('Lỗi khi tải lên ảnh:', error);
       toast({
         variant: 'destructive',
         title: 'Lỗi',
@@ -146,7 +139,11 @@ export default function DepositPage() {
     }
 
     if (settings && Number(amount) < settings.minDeposit) {
-      toast({ variant: 'destructive', title: 'Lỗi', description: `Số tiền nạp tối thiểu là ${settings.minDeposit.toLocaleString()} đ` });
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: `Số tiền nạp tối thiểu là ${settings.minDeposit.toLocaleString()} đ`,
+      });
       return;
     }
 
@@ -156,7 +153,6 @@ export default function DepositPage() {
     }
 
     try {
-      // Lấy token từ cookie hoặc localStorage
       let authToken = getCookie('token') || '';
       if (!authToken && typeof window !== 'undefined') {
         authToken = localStorage.getItem('token') || '';
@@ -166,21 +162,20 @@ export default function DepositPage() {
         throw new Error('Vui lòng đăng nhập lại');
       }
       
-      console.log('Đang gửi yêu cầu nạp tiền...');
       const res = await fetch('/api/deposits', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+          Pragma: 'no-cache',
+          Expires: '0',
         },
         credentials: 'include',
         body: JSON.stringify({
           amount: Number(amount),
           bill: billUrl,
-          status: 'pending'
+          status: 'pending',
         }),
       });
       
@@ -195,11 +190,10 @@ export default function DepositPage() {
         toast({ variant: 'destructive', title: 'Lỗi', description: result.message || 'Có lỗi xảy ra' });
       }
     } catch (err) {
-      console.error('Lỗi khi gửi yêu cầu:', err);
-      toast({ 
-        variant: 'destructive', 
-        title: 'Lỗi', 
-        description: 'Không thể gửi yêu cầu. Vui lòng thử lại sau.' 
+      toast({
+        variant: 'destructive',
+        title: 'Lỗi',
+        description: 'Không thể gửi yêu cầu. Vui lòng thử lại sau.',
       });
     }
   };
@@ -218,13 +212,13 @@ export default function DepositPage() {
           <CardContent className="p-6 space-y-6">
             <div>
               <h3 className="text-lg font-medium text-gray-300 mb-4">Thông tin ngân hàng</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <Label className="text-gray-400">Tên ngân hàng</Label>
                   <Input
-                    value={settings?.bankName || ''}
+                    value={settings?.bankName || 'Đang tải...'}
                     readOnly
-                    className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
+                    className="bg-gray-700 text-white border-gray-600"
                   />
                 </div>
               </div>
@@ -244,11 +238,24 @@ export default function DepositPage() {
                 </p>
               )}
             </div>
-            
+            <div>
+              <Label className="text-gray-400">Tải lên bill</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="bg-gray-700 text-white border-gray-600 focus:border-blue-500"
+              />
+              {bill && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Đã chọn: {bill.name}
+                </p>
+              )}
+            </div>
             <Button
               className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-md transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
               onClick={handleSubmit}
-              disabled={!amount}
+              disabled={!amount || !bill || isUploading}
             >
               {isUploading ? (
                 <>
