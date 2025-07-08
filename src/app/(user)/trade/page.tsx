@@ -257,97 +257,105 @@ const getSessionTimeRange = (time: Date) => {
   }, [user, token]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    let isMounted = true;
+    
+    const updateSession = () => {
+      if (!isMounted) return;
+      
       const now = new Date();
       setCurrentTime(now);
       
-      // Calculate countdown based on seconds (59 - current second)
-      const currentSecond = now.getSeconds();
-      const countdownValue = 59 - currentSecond;
-      setCountdown(countdownValue);
-      setTimeLeft(countdownValue);
-      
-      // Generate session ID for the current time
-      const currentSessionId = generateSessionId(now);
-      
-      // Check if we need to update the session
-      const shouldUpdateSession = 
-        currentSession.sessionId === 'N/A' || 
-        currentSession.sessionId !== currentSessionId;
-      
-      if (shouldUpdateSession) {
-        console.log('Phát hiện phiên mới:', currentSessionId);
-        const { startTime, endTime } = getSessionTimeRange(now);
+      try {
+        // Calculate countdown (59 - current second)
+        const currentSecond = now.getSeconds();
+        const countdownValue = 59 - currentSecond;
+        setCountdown(countdownValue);
+        setTimeLeft(countdownValue);
         
-        // Create new session
-        const newSession = {
-          sessionId: currentSessionId,
-          result: null,
-          status: currentSecond === 59 ? 'active' : 'pending',
-          startTime: startTime,
-          endTime: endTime
-        };
+        // Generate session ID for the current time
+        const currentSessionId = generateSessionId(now);
         
-        // Save current session to history if it's not the initial one
-        if (currentSession.sessionId !== 'N/A') {
-          setPastSessions(prev => [{
-            ...currentSession,
-            status: 'completed',
-            // Auto-generate result if not set
-            result: currentSession.result || (Math.random() > 0.5 ? 'LÊN' : 'XUỐNG')
-          }, ...prev].slice(0, 20));
+        // Only proceed if we have a valid session ID
+        if (!currentSessionId) {
+          console.error('Failed to generate session ID');
+          return;
         }
         
-        setCurrentSession(newSession);
+        // Check if we need to update the session
+        const shouldUpdateSession = 
+          !currentSession?.sessionId || 
+          currentSession.sessionId === 'N/A' || 
+          currentSession.sessionId !== currentSessionId;
         
-        // Fetch latest sessions from server
-        fetchSessions();
+        if (shouldUpdateSession) {
+          console.log('Updating to new session:', currentSessionId);
+          const { startTime, endTime } = getSessionTimeRange(now);
+          
+          if (!startTime || !endTime) {
+            console.error('Invalid session time range');
+            return;
+          }
+          
+          // Create new session with safe defaults
+          const newSession = {
+            sessionId: currentSessionId,
+            result: null,
+            status: 'pending',
+            startTime: startTime,
+            endTime: endTime
+          };
+          
+          // Save current session to history if it's not the initial one
+          if (currentSession?.sessionId && currentSession.sessionId !== 'N/A') {
+            setPastSessions(prev => {
+              const updated = [{
+                ...currentSession,
+                status: 'completed',
+                result: currentSession.result || (Math.random() > 0.5 ? 'LÊN' : 'XUỐNG')
+              }, ...(prev || [])].slice(0, 20);
+              return updated;
+            });
+          }
+          
+          setCurrentSession(newSession);
+          
+          // Fetch latest sessions from server if function exists
+          if (typeof fetchSessions === 'function') {
+            fetchSessions().catch(error => {
+              console.error('Error fetching sessions:', error);
+            });
+          }
+        }
+        
+        // Update status based on time
+        if (currentSession?.status) {
+          if (countdownValue <= 58 && currentSession.status === 'pending') {
+            setCurrentSession(prev => ({ ...(prev || {}), status: 'active' }));
+          } else if (countdownValue === 59 && currentSession.status === 'active' && !currentSession.result) {
+            if (typeof fetchSessionResult === 'function') {
+              fetchSessionResult(currentSession.sessionId).catch(error => {
+                console.error('Error fetching session result:', error);
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error in session timer:', error);
       }
-      
-      // Handle session result when countdown reaches 0 (at 59th second)
-      if (countdownValue === 59 && currentSession.status === 'active' && !currentSession.result) {
-        fetchSessionResult(currentSession.sessionId);
-      }
+    };
 
-      // Update status to active when session starts
-      if (countdownValue <= 58 && currentSession.status === 'pending') {
-        setCurrentSession(prev => ({ ...prev, status: 'active' }));
-      }
-    }, 1000);
+    // Initial update
+    updateSession();
     
-    return () => clearInterval(timer);
+    // Set up interval
+    const timer = setInterval(updateSession, 1000);
+    
+    // Cleanup
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
   }, [currentSession, fetchSessions, fetchSessionResult]);
-
-  const handleSessionUpdate = (data: any) => {
-    const { sessionId, result, status } = data;
-    if (currentSession.sessionId === sessionId) {
-      if (status === 'completed' && result) {
-        const updatedSession = { ...currentSession, result, status };
-        setCurrentSession(updatedSession);
-        handlePayout(updatedSession);
-        if (futureSessions.length > 0) {
-          const [nextSession, ...remainingSessions] = futureSessions;
-          setCurrentSession(nextSession);
-          setFutureSessions(remainingSessions);
-          setPastSessions(prev => [updatedSession, ...prev].slice(0, 20));
-        }
-      }
-    } else if (futureSessions.some(session => session.sessionId === sessionId)) {
-      setFutureSessions(prev =>
-        prev.map(session =>
-          session.sessionId === sessionId ? { ...session, result, status } : session
-        )
-      );
-    } else if (pastSessions.some(session => session.sessionId === sessionId)) {
-      setPastSessions(prev =>
-        prev.map(session =>
-          session.sessionId === sessionId ? { ...session, result, status } : session
-        )
-      );
-    } else {
-      fetchSessions();
-    }
-  };
 
   const fetchSessionResult = async (sessionId: string) => {
     if (USE_MOCK_DATA) {
