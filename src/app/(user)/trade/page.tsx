@@ -86,6 +86,7 @@ export default function TradePage() {
     amount?: number;
     profit?: number;
   }>({ status: "idle" });
+  
   const [currentTime, setCurrentTime] = useState(new Date());
   const [countdown, setCountdown] = useState(59);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -118,244 +119,238 @@ export default function TradePage() {
     });
   };
 
-  const generateSessionId = (time: Date): string => {
-  // Format: yymmddhhmm (năm-tháng-ngày-giờ-phút)
-  const year = String(time.getFullYear()).slice(-2); // lấy 2 chữ số cuối của năm
+ // ... Các import và định nghĩa khác ...
+
+const generateSessionId = (time: Date): string => {
+  if (!(time instanceof Date) || isNaN(time.getTime())) {
+    console.error('Invalid Date provided to generateSessionId');
+    return 'INVALID';
+  }
+  const year = String(time.getFullYear()).slice(-2);
   const month = String(time.getMonth() + 1).padStart(2, '0');
   const day = String(time.getDate()).padStart(2, '0');
   const hours = String(time.getHours()).padStart(2, '0');
-  const minutes = String(time.getMinutes()).padStart(2, '0');
+  const minutes = String(time.getMinutes()).toString().padStart(2, '0');
   return `${year}${month}${day}${hours}${minutes}`;
 };
 
-// Hàm tạo thời gian bắt đầu và kết thúc của phiên
-// Mỗi phiên bắt đầu từ giây thứ 1 và kéo dài đúng 1 phút
 const getSessionTimeRange = (time: Date) => {
-  // Tạo bản sao để không ảnh hưởng đến tham số gốc
-  const sessionTime = new Date(time);
-  
-  // Đặt giây về 1 (bắt đầu từ giây thứ 1)
-  sessionTime.setSeconds(1, 0);
-  
-  // Nếu đã qua giây thứ 1, chuyển sang phút tiếp theo
-  if (time.getSeconds() >= 1) {
-    sessionTime.setMinutes(sessionTime.getMinutes() + 1);
+  if (!(time instanceof Date) || isNaN(time.getTime())) {
+    console.error('Invalid Date provided to getSessionTimeRange');
+    return { startTime: null, endTime: null };
   }
-  
+  const sessionTime = new Date(time);
+  const hours = sessionTime.getHours();
+  if (hours < 9 || hours >= 17) {
+    console.warn('Session time outside of 9:00-17:00 range');
+    return { startTime: null, endTime: null };
+  }
+  sessionTime.setSeconds(1, 0);
   const startTime = new Date(sessionTime);
-  // Kết thúc sau đúng 1 phút (60 giây)
-  const endTime = new Date(sessionTime.getTime() + 60000);
-  
+  const endTime = new Date(sessionTime.getTime() + 60000 - 1); // End at hh:mm:59
   return { startTime, endTime };
 };
-  
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
-  };
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/login');
-      toast({ variant: 'destructive', title: 'Vui lòng đăng nhập để sử dụng tính năng này' });
+// Đảm bảo fetchSessions và fetchSessionResult được định nghĩa trước
+const fetchSessionResult = async (sessionId: string) => {
+  if (USE_MOCK_DATA) {
+    console.log('Using mock session result data');
+    setTimeout(() => {
+      if (currentSession && currentSession.sessionId === sessionId) {
+        const result = Math.random() > 0.5 ? 'UP' : 'DOWN';
+        handleSessionUpdate({
+          sessionId,
+          result: result,
+          status: 'completed'
+        });
+        setTradeHistory(prev =>
+          prev.map(item => {
+            if (item.session.toString() === sessionId.slice(-4)) {
+              const isWin = item.direction === result;
+              return {
+                ...item,
+                status: isWin ? 'win' : 'lose',
+                profit: isWin ? item.amount * 0.95 : -item.amount
+              };
+            }
+            return item;
+          })
+        );
+        const relevantTrades = tradeHistory.filter(t =>
+          t.session.toString() === sessionId.slice(-4)
+        );
+        relevantTrades.forEach(trade => {
+          const isWin = trade.direction === result;
+          if (isWin) {
+            setBalance(prev => prev + trade.amount * 1.95);
+          }
+        });
+      }
+    }, 2000);
+    return;
+  }
+  if (!token) {
+    console.error('No auth token available');
+    return;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
+    if (!response.ok) throw new Error('Failed to fetch session result');
+    const session = await response.json();
+    if (session.result && session.status === 'completed') {
+      if (currentSession && currentSession.sessionId === sessionId) {
+        handleSessionUpdate({
+          sessionId,
+          result: session.result,
+          status: 'completed'
+        });
+      }
     }
-    if (user && user.balance) {
-      setBalance(user.balance);
+  } catch (error) {
+    console.error('Error fetching session result:', error);
+    if (USE_MOCK_DATA) {
+      setTimeout(() => {
+        if (currentSession && currentSession.sessionId === sessionId) {
+          const result = Math.random() > 0.5 ? 'UP' : 'DOWN';
+          handleSessionUpdate({
+            sessionId,
+            result: result,
+            status: 'completed'
+          });
+        }
+      }, 1000);
     }
-    if (token && user) {
-      fetchSessions();
-      setTradeHistory([]);
-    }
-  }, [token, user, loading, router, toast]);
+  }
+};
 
-  useEffect(() => {
-    if (!user || !token) return;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 3;
+const fetchSessions = async () => {
+  setIsLoading(true);
+  try {
+    if (!navigator.onLine) {
+      return useMockSessions();
+    }
+    if (!token || USE_MOCK_DATA) {
+      console.log('Using mock data for development');
+      return useMockSessions();
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
+    if (!response.ok) throw new Error(`Failed to fetch sessions: ${response.status} ${response.statusText}`);
+    const sessions = await response.json();
+    const now = new Date();
+    processSessionData(sessions, now);
+    return sessions;
+  } catch (error) {
+    console.error('Error in fetchSessions:', error);
+    setError('Không thể tải phiên giao dịch. Vui lòng thử lại sau.');
+    return useMockSessions();
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-    const connectWebSocket = () => {
-      if (reconnectAttempts >= maxReconnectAttempts) {
-        console.log('Đã thử kết nối WebSocket nhiều lần không thành công. Đang tạm dừng kết nối.');
+useEffect(() => {
+  let isMounted = true;
+  const updateSession = () => {
+    if (!isMounted) return;
+    const now = new Date();
+    setCurrentTime(now);
+    const currentSecond = now.getSeconds();
+    const countdownValue = 59 - currentSecond;
+    setCountdown(countdownValue);
+    setTimeLeft(countdownValue);
+
+    // Only update session if within trading hours (9:00-17:00)
+    const hours = now.getHours();
+    if (hours < 9 || hours >= 17) {
+      setCurrentSession({
+        sessionId: 'N/A',
+        result: null,
+        status: 'pending',
+        startTime: new Date(),
+        endTime: new Date()
+      });
+      setCountdown(0);
+      return;
+    }
+
+    const currentSessionId = generateSessionId(now);
+    if (!currentSessionId) {
+      console.error('Failed to generate session ID');
+      return;
+    }
+    const shouldUpdateSession = 
+      !currentSession?.sessionId || 
+      currentSession.sessionId === 'N/A' || 
+      currentSession.sessionId !== currentSessionId;
+    if (shouldUpdateSession) {
+      console.log('Updating to new session:', currentSessionId);
+      const { startTime, endTime } = getSessionTimeRange(now);
+      if (!startTime || !endTime) {
+        console.error('Invalid session time range');
+        setCurrentSession({
+          sessionId: 'N/A',
+          result: null,
+          status: 'pending',
+          startTime: new Date(),
+          endTime: new Date()
+        });
         return;
       }
-      try {
-        // Đảm bảo API_BASE_URL được định nghĩa
-        if (!API_BASE_URL) {
-          console.error('API_BASE_URL không được định nghĩa, không thể kết nối WebSocket');
-          return;
-        }
-
-        // Tạo WebSocket URL an toàn hơn
-        let wsUrl = '';
-        if (API_BASE_URL.startsWith('https://')) {
-          wsUrl = `wss://${API_BASE_URL.replace('https://', '')}/ws`;
-        } else if (API_BASE_URL.startsWith('http://')) {
-          wsUrl = `ws://${API_BASE_URL.replace('http://', '')}/ws`;
-        } else {
-          // Fallback cho môi trường phát triển
-          wsUrl = `ws://${window.location.hostname}:${window.location.port || '3000'}/ws`;
-        }
-
-        console.log(`Đang kết nối WebSocket đến: ${wsUrl}`);
-        
-        // Xử lý lỗi khi tạo WebSocket
-        const ws = new WebSocket(wsUrl);
-        ws.onopen = () => {
-          console.log('WebSocket connected');
-          reconnectAttempts = 0;
-          if (token) {
-            ws.send(JSON.stringify({ type: 'auth', token }));
-          }
-        };
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'sessionUpdate') {
-              handleSessionUpdate(data);
-            } else if (data.type === 'balanceUpdate') {
-              setBalance(data.balance);
-            }
-          } catch (error) {
-            console.error('WebSocket message error:', error);
-          }
-        };
-        ws.onclose = () => {
-          console.log('WebSocket disconnected, trying to reconnect...');
-          reconnectAttempts++;
-          const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts));
-          setTimeout(connectWebSocket, delay);
-        };
-        ws.onerror = (error) => {
-          // Cải thiện xử lý lỗi WebSocket
-          console.error('WebSocket error:', error);
-          
-          // Nếu đang ở chế độ development với mock data, không hiển thị lỗi
-          if (USE_MOCK_DATA) {
-            console.log('Đang ở chế độ mock data, bỏ qua lỗi WebSocket');
-          } else {
-            // Chỉ hiện toast lỗi nếu không phải mock mode
-            toast({ 
-              variant: 'destructive', 
-              title: 'Lỗi kết nối', 
-              description: 'Không thể kết nối đến máy chủ giao dịch. Đang sử dụng dữ liệu cục bộ.' 
-            });
-          }
-          ws.close();
-        };
-        wsRef.current = ws;
-      } catch (error) {
-        console.error('WebSocket connection error:', error);
-        setTimeout(connectWebSocket, 3000);
+      const newSession = {
+        sessionId: currentSessionId,
+        result: null,
+        status: 'pending',
+        startTime: startTime,
+        endTime: endTime
+      };
+      if (currentSession?.sessionId && currentSession.sessionId !== 'N/A') {
+        setPastSessions(prev => {
+          const updated = [{
+            ...currentSession,
+            status: 'completed',
+            result: currentSession.result || (Math.random() > 0.5 ? 'LÊN' : 'XUỐNG')
+          }, ...(prev || [])].slice(0, 20);
+          return updated;
+        });
       }
-    };
-    connectWebSocket();
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
+      setCurrentSession(newSession);
+      fetchSessions().catch(error => {
+        console.error('Error fetching sessions:', error);
+      });
+    }
+    if (currentSession?.status) {
+      if (countdownValue <= 58 && currentSession.status === 'pending') {
+        setCurrentSession(prev => ({ ...(prev || {}), status: 'active' }));
+      } else if (countdownValue === 59 && currentSession.status === 'active' && !currentSession.result) {
+        fetchSessionResult(currentSession.sessionId).catch(error => {
+          console.error('Error fetching session result:', error);
+        });
       }
-    };
-  }, [user, token]);
-
-  useEffect(() => {
-    let isMounted = true;
-    
-    const updateSession = () => {
-      if (!isMounted) return;
-      
-      const now = new Date();
-      setCurrentTime(now);
-      
-      try {
-        // Calculate countdown (59 - current second)
-        const currentSecond = now.getSeconds();
-        const countdownValue = 59 - currentSecond;
-        setCountdown(countdownValue);
-        setTimeLeft(countdownValue);
-        
-        // Generate session ID for the current time
-        const currentSessionId = generateSessionId(now);
-        
-        // Only proceed if we have a valid session ID
-        if (!currentSessionId) {
-          console.error('Failed to generate session ID');
-          return;
-        }
-        
-        // Check if we need to update the session
-        const shouldUpdateSession = 
-          !currentSession?.sessionId || 
-          currentSession.sessionId === 'N/A' || 
-          currentSession.sessionId !== currentSessionId;
-        
-        if (shouldUpdateSession) {
-          console.log('Updating to new session:', currentSessionId);
-          const { startTime, endTime } = getSessionTimeRange(now);
-          
-          if (!startTime || !endTime) {
-            console.error('Invalid session time range');
-            return;
-          }
-          
-          // Create new session with safe defaults
-          const newSession = {
-            sessionId: currentSessionId,
-            result: null,
-            status: 'pending',
-            startTime: startTime,
-            endTime: endTime
-          };
-          
-          // Save current session to history if it's not the initial one
-          if (currentSession?.sessionId && currentSession.sessionId !== 'N/A') {
-            setPastSessions(prev => {
-              const updated = [{
-                ...currentSession,
-                status: 'completed',
-                result: currentSession.result || (Math.random() > 0.5 ? 'LÊN' : 'XUỐNG')
-              }, ...(prev || [])].slice(0, 20);
-              return updated;
-            });
-          }
-          
-          setCurrentSession(newSession);
-          
-          // Fetch latest sessions from server if function exists
-          if (typeof fetchSessions === 'function') {
-            fetchSessions().catch(error => {
-              console.error('Error fetching sessions:', error);
-            });
-          }
-        }
-        
-        // Update status based on time
-        if (currentSession?.status) {
-          if (countdownValue <= 58 && currentSession.status === 'pending') {
-            setCurrentSession(prev => ({ ...(prev || {}), status: 'active' }));
-          } else if (countdownValue === 59 && currentSession.status === 'active' && !currentSession.result) {
-            if (typeof fetchSessionResult === 'function') {
-              fetchSessionResult(currentSession.sessionId).catch(error => {
-                console.error('Error fetching session result:', error);
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error in session timer:', error);
-      }
-    };
-
-    // Initial update
-    updateSession();
-    
-    // Set up interval
-    const timer = setInterval(updateSession, 1000);
-    
-    // Cleanup
-    return () => {
-      isMounted = false;
-      clearInterval(timer);
-    };
-  }, [currentSession, fetchSessions, fetchSessionResult]);
+    }
+  };
+  updateSession();
+  const timer = setInterval(updateSession, 1000);
+  return () => {
+    isMounted = false;
+    clearInterval(timer);
+  };
+}, [currentSession]);
 
   const fetchSessionResult = async (sessionId: string) => {
     if (USE_MOCK_DATA) {
