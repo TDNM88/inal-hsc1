@@ -15,15 +15,13 @@ import {
 } from "./ui/dropdown-menu"
 import { User as UserIcon, LogOut, Wallet, CreditCard, ArrowUpRight, ArrowDownLeft, 
   Clock, ChevronDown, Phone, Menu, X } from "lucide-react"
-import loading from "@/app/(auth)/login/loading"
 
 export default function Header() {
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { user, isLoading, logout } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
-  // Handle scrolling effect
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 10)
@@ -41,10 +39,7 @@ export default function Header() {
     }
   }
   
-  // Track pathname for route changes
   const pathname = usePathname()
-  
-  // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [pathname])
@@ -92,9 +87,8 @@ export default function Header() {
             >
               Tin tức
             </Button>
-            
             {/* Wallet dropdown for logged in users */}
-            {!loading && user && (
+            {!isLoading && user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 bg-white hover:bg-blue-50">
@@ -146,7 +140,7 @@ export default function Header() {
           {/* User Account dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              {user ? (
+              {!isLoading && user ? (
                 <Button variant="ghost" size="icon" className="rounded-full overflow-hidden h-8 w-8">
                   <Image 
                     src={user.avatar || "/avatars/default.png"} 
@@ -165,25 +159,20 @@ export default function Header() {
               )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              {user ? (
+              {!isLoading && user ? (
                 <>
                   {/* Username display */}
                   <div className="px-4 py-2 text-sm font-medium">{user.username || 'tdnm'}</div>
-                  
                   <DropdownMenuItem onClick={() => router.push("/account")}>
                     <span>Tổng quan tài khoản</span>
                   </DropdownMenuItem>
-                  
                   <DropdownMenuItem onClick={() => router.push("/account?tab=password")}>
                     <span>Cài đặt bảo mật</span>
                   </DropdownMenuItem>
-                  
                   <DropdownMenuItem onClick={() => router.push("/account?tab=verify")}>
                     <span>Xác minh danh tính</span>
                   </DropdownMenuItem>
-                  
                   <DropdownMenuSeparator />
-                  
                   <DropdownMenuItem onClick={handleLogout}>
                     <span>Đăng xuất</span>
                   </DropdownMenuItem>
@@ -258,12 +247,14 @@ export default function Header() {
             </div>
             
             <div className="px-5 pb-6">
-              <button 
-                onClick={handleLogout}
-                className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-md flex justify-center items-center font-medium text-base"
-              >
-                Đăng xuất
-              </button>
+              {!isLoading && user && (
+                <button 
+                  onClick={handleLogout}
+                  className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-md flex justify-center items-center font-medium text-base"
+                >
+                  Đăng xuất
+                </button>
+              )}
             </div>
           </div>
         </div>
