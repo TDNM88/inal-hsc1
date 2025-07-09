@@ -1,6 +1,12 @@
-"use client"
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 
 type User = {
   id: string;
@@ -33,7 +39,10 @@ type User = {
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (
+    username: string,
+    password: string
+  ) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   isAuthenticated: () => boolean;
   isAdmin: () => boolean;
@@ -45,7 +54,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
@@ -54,109 +63,131 @@ function useAuthStandalone(): AuthContextType {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Gọi khi khởi tạo để kiểm tra trạng thái đăng nhập
   useEffect(() => {
     checkAuth();
     // eslint-disable-next-line
   }, []);
 
- const checkAuth = async () => {
-  setIsLoading(true);
-  try {
-    // Lấy token từ localStorage (nếu có)
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    // Gọi API lấy thông tin user, gửi kèm cookie và Authorization header nếu có
-    const res = await fetch('/api/auth/me', {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      }
-    });
-    // Xử lý response
-    if (res.ok) {
-      const data = await res.json().catch(e => {
-        console.error('Error parsing auth response:', e);
-        return null;
+  // Kiểm tra xác thực
+  const checkAuth = async () => {
+    setIsLoading(true);
+    try {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch("/api/auth/me", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
-      if (data?.success && data.user) {
-        setUser(data.user);
+      if (res.ok) {
+        const data = await res.json().catch((e) => {
+          console.error("Error parsing auth response:", e);
+          return null;
+        });
+        if (data?.success && data.user) {
+          setUser(data.user);
+        } else {
+          setUser(null);
+        }
       } else {
         setUser(null);
       }
-    } else {
+    } catch (error) {
       setUser(null);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    setUser(null);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
+  // Đăng nhập
   const login = async (username: string, password: string) => {
     try {
       if (!username || !password) {
-        return { success: false, message: 'Vui lòng nhập tên đăng nhập và mật khẩu' };
+        return {
+          success: false,
+          message: "Vui lòng nhập tên đăng nhập và mật khẩu",
+        };
       }
       setUser(null);
-      const apiUrl = new URL('/api/login', window.location.origin).toString();
+      const apiUrl = new URL("/api/login", window.location.origin).toString();
       const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
         },
         body: JSON.stringify({ username: username.trim(), password }),
-        credentials: 'include',
+        credentials: "include",
       });
-      const contentType = res.headers.get('content-type');
+      const contentType = res.headers.get("content-type");
       let data;
-      if (contentType && contentType.includes('application/json')) {
+      if (contentType && contentType.includes("application/json")) {
         data = await res.json();
       } else {
-        return { success: false, message: 'Phản hồi không hợp lệ từ máy chủ' };
+        return {
+          success: false,
+          message: "Phản hồi không hợp lệ từ máy chủ",
+        };
       }
       if (res.ok && data?.success) {
         const token = data.token || data.accessToken;
-        if (token && typeof window !== 'undefined') {
-          localStorage.setItem('token', token);
+        if (token && typeof window !== "undefined") {
+          localStorage.setItem("token", token);
         }
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Đợi cookie/token được thiết lập
+        await new Promise((resolve) => setTimeout(resolve, 400));
         await checkAuth();
-        if (user) {
-          return { success: true, message: 'Đăng nhập thành công' };
-        }
-        return { success: true, message: 'Đăng nhập thành công. Hệ thống đang đồng bộ thông tin...' };
+        // Không dùng user ở đây vì setUser bất đồng bộ, chỉ check lại sau checkAuth.
+        return {
+          success: true,
+          message: "Đăng nhập thành công",
+        };
       } else {
-        return { success: false, message: data?.message || `Đăng nhập thất bại (Mã lỗi: ${res.status})` };
+        return {
+          success: false,
+          message:
+            data?.message || `Đăng nhập thất bại (Mã lỗi: ${res.status})`,
+        };
       }
     } catch (error) {
-      return { success: false, message: 'Lỗi không xác định' };
+      return {
+        success: false,
+        message: "Lỗi không xác định",
+      };
     }
   };
 
+  // Đăng xuất
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        credentials: 'include'
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
       });
-      if (typeof window !== 'undefined') localStorage.removeItem('token');
+      if (typeof window !== "undefined") localStorage.removeItem("token");
       setUser(null);
     } catch (error) {
       setUser(null);
     }
   };
 
+  // Kiểm tra xác thực
   const isAuthenticated = () => user !== null;
-  const isAdmin = () => user?.role === 'admin';
-  const refreshUser = async () => { await checkAuth(); };
+  // Kiểm tra quyền admin
+  const isAdmin = () => user?.role === "admin";
+  // Làm mới thông tin user
+  const refreshUser = async () => {
+    await checkAuth();
+  };
 
   return {
     user,
@@ -176,8 +207,6 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const auth = useAuthStandalone();
   return (
-    <AuthContext.Provider value={auth}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>
   );
 }
