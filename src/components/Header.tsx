@@ -152,7 +152,7 @@ export default function Header() {
                 </Button>
               ) : (
                 <Button variant="outline" size="sm" className="gap-2">
-                  <UserIcon className="h-4 w-4" />
+                  <Image src="/icons/111.svg" alt="Tài khoản" width={20} height={20} />
                   <span>Tài khoản</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
