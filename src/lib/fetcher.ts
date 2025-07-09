@@ -1,2 +1,4 @@
-export const fetcher = (url: string, token: string) =>
-  fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((res) => res.json())
+export const fetcher = (url: string) => {
+  const token = localStorage.getItem("token")
+  return fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
+}
