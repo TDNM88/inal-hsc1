@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react";
 
-// Define a type for the user to improve type safety
 interface User {
   id: string;
-  role: string; // e.g., "admin" or "user"
-  [key: string]: any; // Allow additional properties if needed
+  role: string;
+  [key: string]: any;
 }
 
 export function useAuth() {
@@ -21,13 +20,11 @@ export function useAuth() {
         const storedUser = localStorage.getItem("user");
 
         if (storedToken && storedUser) {
-          // Validate token (e.g., check if it’s a non-empty string)
           if (typeof storedToken !== "string" || storedToken.trim() === "") {
             console.warn("Invalid token found in localStorage");
             return;
           }
 
-          // Parse user safely
           const parsedUser = JSON.parse(storedUser);
           if (!parsedUser || typeof parsedUser !== "object") {
             console.warn("Invalid user data found in localStorage");
@@ -39,7 +36,6 @@ export function useAuth() {
         }
       } catch (error) {
         console.error("Failed to initialize auth from localStorage:", error);
-        // Optionally clear invalid data
         localStorage.removeItem("token");
         localStorage.removeItem("user");
       } finally {
@@ -51,20 +47,27 @@ export function useAuth() {
   }, []);
 
   const login = (newToken: string, newUser: User) => {
-    if (!newToken || typeof newToken !== "string") {
+    if (!newToken || typeof newToken !== "string" || newToken.trim() === "") {
       throw new Error("Invalid token provided");
     }
     if (!newUser || typeof newUser !== "object") {
       throw new Error("Invalid user provided");
     }
 
+    const previousToken = token;
+    const previousUser = user;
+
     setToken(newToken);
     setUser(newUser);
+
     try {
       localStorage.setItem("token", newToken);
       localStorage.setItem("user", JSON.stringify(newUser));
     } catch (error) {
       console.error("Failed to save auth data to localStorage:", error);
+      setToken(previousToken);
+      setUser(previousUser);
+      throw new Error("Failed to persist authentication data");
     }
   };
 
@@ -80,7 +83,7 @@ export function useAuth() {
   };
 
   const isAuthenticated = () => {
-    return !!token;
+    return !!token && token.trim() !== "";
   };
 
   const isAdmin = () => {
