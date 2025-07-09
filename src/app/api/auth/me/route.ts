@@ -6,28 +6,24 @@ import { ObjectId } from "mongodb"
 export async function GET(request: Request) {
   try {
     // Lấy token từ cookie hoặc Authorization header
-const cookies = request.headers.get("cookie") || ""
-const tokenMatch = cookies.match(/token=([^;]+)/)
-let token = tokenMatch ? tokenMatch[1] : null
+    const cookies = request.headers.get("cookie") || ""
+    const tokenMatch = cookies.match(/token=([^;]+)/)
+    let token = tokenMatch ? tokenMatch[1] : null
 
-if (!token) {
-  // Nếu không có token ở cookie, thử lấy ở header Authorization
-  const authHeader = request.headers.get("authorization") || request.headers.get("Authorization")
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    token = authHeader.slice(7)
-  }
-}
+    if (!token) {
+      // Nếu không có token ở cookie, thử lấy ở Authorization header
+      const authHeader = request.headers.get("authorization") || request.headers.get("Authorization")
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        token = authHeader.slice(7)
+      }
+    }
 
-if (!token) {
-  return NextResponse.json({ success: false, message: "Chưa đăng nhập" }, { status: 401 })
-}
-    console.log('Token found, length:', token.length); // Debug log
-    
+    if (!token) {
+      return NextResponse.json({ success: false, message: "Chưa đăng nhập" }, { status: 401 })
+    }
+
     const tokenData = parseToken(token)
-    console.log('Parsed token data:', tokenData); // Debug log
-
     if (!tokenData) {
-      console.log('Invalid token format');
       return NextResponse.json({ success: false, message: "Token không hợp lệ" }, { status: 401 })
     }
 
@@ -46,81 +42,43 @@ if (!token) {
       throw new Error("Không thể kết nối cơ sở dữ liệu")
     }
 
-    console.log('Looking up user with ID:', tokenData.userId);
-    
-    try {
-      // First get the user without any projection to see all available fields
-      const userDoc = await db.collection("users").findOne(
-        { _id: new ObjectId(tokenData.userId) }
-      );
-      
-      if (!userDoc) {
-        console.error('User not found in database');
-        return NextResponse.json({ 
-          success: false, 
-          message: "Người dùng không tồn tại",
-          _debug: process.env.NODE_ENV !== 'production' ? {
-            userId: tokenData.userId,
-            error: 'user_not_found'
-          } : undefined
-        }, { status: 404 });
-      }
-      
-      // Create a new object with only the fields we want to return
-      const userData = {
-        _id: userDoc._id,
-        username: userDoc.username,
-        role: userDoc.role || 'user',
-        balance: userDoc.balance || { available: 0, frozen: 0 },
-        bank: userDoc.bank,
-        verification: userDoc.verification,
-        status: userDoc.status,
-        createdAt: userDoc.createdAt,
-        lastLogin: userDoc.lastLogin,
-        // Add any other fields you want to include
-      };
-      
-      console.log('Found user:', { 
-        id: userData._id, 
-        username: userData.username,
-        role: userData.role 
-      });
-      
-      // Check if user is still active
-      if (userData.status && !userData.status.active) {
-        console.log('User account is inactive');
-        return NextResponse.json({ success: false, message: "Tài khoản đã bị khóa" }, { status: 401 });
-      }
-      
-      console.log('User is active, proceeding with auth');
+    const userDoc = await db.collection("users").findOne(
+      { _id: new ObjectId(tokenData.userId) }
+    )
 
-      const userResponse = {
-        id: userData._id.toString(),
-        username: userData.username,
-        role: userData.role || "user",
-        balance: userData.balance || { available: 0, frozen: 0 },
-        bank: userData.bank || { name: "", accountNumber: "", accountHolder: "" },
-        verification: userData.verification || { verified: false, cccdFront: "", cccdBack: "" },
-        status: userData.status || { active: true, betLocked: false, withdrawLocked: false },
-        createdAt: userData.createdAt,
-        lastLogin: userData.lastLogin,
-      }
-
-      return NextResponse.json({
-        success: true,
-        user: userResponse,
-      })
-    } catch (dbError) {
-      console.error('Database error in /api/auth/me:', dbError);
+    if (!userDoc) {
       return NextResponse.json({ 
         success: false, 
-        message: "Lỗi cơ sở dữ liệu",
+        message: "Người dùng không tồn tại",
         _debug: process.env.NODE_ENV !== 'production' ? {
-          error: 'database_error',
-          message: dbError instanceof Error ? dbError.message : String(dbError)
+          userId: tokenData.userId,
+          error: 'user_not_found'
         } : undefined
-      }, { status: 500 });
+      }, { status: 404 })
     }
+
+    // Chỉ trả về các trường cần thiết
+    const userResponse = {
+      id: userDoc._id.toString(),
+      username: userDoc.username,
+      role: userDoc.role || "user",
+      balance: userDoc.balance || { available: 0, frozen: 0 },
+      bank: userDoc.bank || { name: "", accountNumber: "", accountHolder: "" },
+      verification: userDoc.verification || { verified: false, cccdFront: "", cccdBack: "" },
+      status: userDoc.status || { active: true, betLocked: false, withdrawLocked: false },
+      createdAt: userDoc.createdAt,
+      lastLogin: userDoc.lastLogin,
+    }
+
+    // Kiểm tra trạng thái tài khoản
+    if (userResponse.status && !userResponse.status.active) {
+      return NextResponse.json({ success: false, message: "Tài khoản đã bị khóa" }, { status: 401 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      user: userResponse,
+    })
   } catch (error) {
     console.error("Auth me error:", error)
     return NextResponse.json({ success: false, message: "Lỗi hệ thống" }, { status: 500 })
