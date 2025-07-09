@@ -106,65 +106,20 @@ function useAuthStandalone(): AuthContextType {
   };
 
   // Đăng nhập
-  const login = async (username: string, password: string) => {
-    try {
-      if (!username || !password) {
-        return {
-          success: false,
-          message: "Vui lòng nhập tên đăng nhập và mật khẩu",
-        };
-      }
-      setUser(null);
-      const apiUrl = new URL("/api/login", window.location.origin).toString();
-      const res = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-        body: JSON.stringify({ username: username.trim(), password }),
-        credentials: "include",
-      });
-      const contentType = res.headers.get("content-type");
-      let data;
-      if (contentType && contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        return {
-          success: false,
-          message: "Phản hồi không hợp lệ từ máy chủ",
-        };
-      }
-      if (res.ok && data?.success) {
-        const token = data.token || data.accessToken;
-        if (token && typeof window !== "undefined") {
-          localStorage.setItem("token", token);
-        }
-        // Đợi cookie/token được thiết lập
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        await checkAuth();
-        // Không dùng user ở đây vì setUser bất đồng bộ, chỉ check lại sau checkAuth.
-        return {
-          success: true,
-          message: "Đăng nhập thành công",
-        };
-      } else {
-        return {
-          success: false,
-          message:
-            data?.message || `Đăng nhập thất bại (Mã lỗi: ${res.status})`,
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: "Lỗi không xác định",
-      };
-    }
-  };
+ const login = (newToken: string, newUser: any) => {
+  setToken(newToken)
+  setUser(newUser)
+  localStorage.setItem("token", newToken)
+  localStorage.setItem("user", JSON.stringify(newUser))
+  document.cookie = `token=${newToken}; path=/; max-age=604800`
+}
+const logout = () => {
+  setToken(null)
+  setUser(null)
+  localStorage.removeItem("token")
+  localStorage.removeItem("user")
+  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+}
 
   // Đăng xuất
   const logout = async () => {
