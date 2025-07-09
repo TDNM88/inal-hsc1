@@ -121,19 +121,7 @@ const logout = () => {
   document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 }
 
-  // Đăng xuất
-  const logout = async () => {
-    try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-      if (typeof window !== "undefined") localStorage.removeItem("token");
-      setUser(null);
-    } catch (error) {
-      setUser(null);
-    }
-  };
+  
 
   // Kiểm tra xác thực
   const isAuthenticated = () => user !== null;
