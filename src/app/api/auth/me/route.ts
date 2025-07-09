@@ -5,19 +5,22 @@ import { ObjectId } from "mongodb"
 
 export async function GET(request: Request) {
   try {
-    // Get token from cookie
-    const cookies = request.headers.get("cookie") || ""
-    console.log('Cookies:', cookies); // Debug log
-    
-    const tokenMatch = cookies.match(/token=([^;]+)/)
-    console.log('Token match:', tokenMatch ? 'found' : 'not found'); // Debug log
+    // Lấy token từ cookie hoặc Authorization header
+const cookies = request.headers.get("cookie") || ""
+const tokenMatch = cookies.match(/token=([^;]+)/)
+let token = tokenMatch ? tokenMatch[1] : null
 
-    if (!tokenMatch) {
-      console.log('No token found in cookies');
-      return NextResponse.json({ success: false, message: "Chưa đăng nhập" }, { status: 401 })
-    }
+if (!token) {
+  // Nếu không có token ở cookie, thử lấy ở header Authorization
+  const authHeader = request.headers.get("authorization") || request.headers.get("Authorization")
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7)
+  }
+}
 
-    const token = tokenMatch[1]
+if (!token) {
+  return NextResponse.json({ success: false, message: "Chưa đăng nhập" }, { status: 401 })
+}
     console.log('Token found, length:', token.length); // Debug log
     
     const tokenData = parseToken(token)
