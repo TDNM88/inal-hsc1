@@ -18,10 +18,11 @@ import { User as UserIcon, LogOut, Wallet, CreditCard, ArrowUpRight, ArrowDownLe
 
 export default function Header() {
   const router = useRouter()
-  const { user, isLoading, logout } = useAuth()
+  const { user, loading, logout } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
+  // Handle scrolling effect
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 10)
@@ -39,7 +40,10 @@ export default function Header() {
     }
   }
   
+  // Track pathname for route changes
   const pathname = usePathname()
+  
+  // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [pathname])
@@ -55,7 +59,7 @@ export default function Header() {
               src="/logo.png" 
               alt="London HSC" 
               width={120} 
-              height={100} 
+              height={40} 
               className="h-10 w-auto"
               priority
             />
@@ -87,8 +91,9 @@ export default function Header() {
             >
               Tin tức
             </Button>
+            
             {/* Wallet dropdown for logged in users */}
-            {!isLoading && user && (
+            {!loading && user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 bg-white hover:bg-blue-50">
@@ -140,7 +145,7 @@ export default function Header() {
           {/* User Account dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              {!isLoading && user ? (
+              {user ? (
                 <Button variant="ghost" size="icon" className="rounded-full overflow-hidden h-8 w-8">
                   <Image 
                     src={user.avatar || "/avatars/default.png"} 
@@ -152,27 +157,32 @@ export default function Header() {
                 </Button>
               ) : (
                 <Button variant="outline" size="sm" className="gap-2">
-                  <Image src="/icons/111.svg" alt="Tài khoản" width={20} height={20} />
+                  <UserIcon className="h-4 w-4" />
                   <span>Tài khoản</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              {!isLoading && user ? (
+              {user ? (
                 <>
                   {/* Username display */}
                   <div className="px-4 py-2 text-sm font-medium">{user.username || 'tdnm'}</div>
+                  
                   <DropdownMenuItem onClick={() => router.push("/account")}>
                     <span>Tổng quan tài khoản</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/account?tab=password")}>
+                  
+                  <DropdownMenuItem onClick={() => router.push("/security")}>
                     <span>Cài đặt bảo mật</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/account?tab=verify")}>
+                  
+                  <DropdownMenuItem onClick={() => router.push("/verification")}>
                     <span>Xác minh danh tính</span>
                   </DropdownMenuItem>
+                  
                   <DropdownMenuSeparator />
+                  
                   <DropdownMenuItem onClick={handleLogout}>
                     <span>Đăng xuất</span>
                   </DropdownMenuItem>
@@ -192,73 +202,50 @@ export default function Header() {
         </div>
       </div>
       
-      {/* Mobile Menu Drawer */}
+      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 flex flex-col bg-[#f7faff]">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <div className="flex items-center">
-              <Image 
-                src="/logo.png" 
-                alt="London LLEG EXCHANGE" 
-                width={180} 
-                height={60} 
-                className="h-12 w-auto"
-              />
-            </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="text-gray-500"
-            >
-              <X className="h-6 w-6" />
-            </Button>
-          </div>
-          
-          <div className="flex-1 overflow-auto">
-            <nav className="flex flex-col w-full">
-              <Link href="/" className="py-4 px-5 border-b border-gray-200 text-base">
-                Trang chủ
-              </Link>
-              <Link href="/trade" className="py-4 px-5 border-b border-gray-200 text-base">
-                Giao dịch
-              </Link>
-              <Link href="/orders" className="py-4 px-5 border-b border-gray-200 text-base">
-                Lịch sử giao dịch
-              </Link>
-              <Link href="/account" className="py-4 px-5 border-b border-gray-200 text-base">
-                Tổng quan tài khoản
-              </Link>
-              <Link href="/security" className="py-4 px-5 border-b border-gray-200 text-base">
-                Cài đặt bảo mật
-              </Link>
-              <Link href="/account?tab=verify" className="py-4 px-5 border-b border-gray-200 text-base">
-                Xác minh danh tính
-              </Link>
-            </nav>
-            
-            <div className="grid grid-cols-2 gap-4 p-5 mt-4">
-              <Link href="/deposit" className="bg-green-600 text-white py-3 px-4 rounded-md flex justify-center items-center font-medium text-base">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsMobileMenuOpen(false)}></div>
+      )}
+      
+      {/* Mobile Menu Drawer */}
+      <div className={`fixed top-16 left-0 w-full bg-white z-40 transform transition-transform duration-300 ease-in-out shadow-lg ${isMobileMenuOpen ? 'translate-y-0' : '-translate-y-full'}`}>
+        <div className="border-t border-gray-200">
+          <nav className="flex flex-col w-full">
+            <Link href="/" className="py-3 px-4 border-b border-gray-200 hover:bg-gray-50">
+              Trang chủ
+            </Link>
+            <Link href="/trade" className="py-3 px-4 border-b border-gray-200 hover:bg-gray-50">
+              Giao dịch
+            </Link>
+            <Link href="/orders" className="py-3 px-4 border-b border-gray-200 hover:bg-gray-50">
+              Lịch sử giao dịch
+            </Link>
+            <Link href="/account" className="py-3 px-4 border-b border-gray-200 hover:bg-gray-50">
+              Tổng quan tài khoản
+            </Link>
+            <Link href="/security" className="py-3 px-4 border-b border-gray-200 hover:bg-gray-50">
+              Cài đặt bảo mật
+            </Link>
+            <Link href="/verification" className="py-3 px-4 border-b border-gray-200 hover:bg-gray-50">
+              Xác minh danh tính
+            </Link>
+            <div className="grid grid-cols-2 gap-4 p-4">
+              <Link href="/deposit" className="bg-green-600 text-white py-3 rounded-md flex justify-center items-center font-medium">
                 Nạp tiền
               </Link>
-              <Link href="/withdraw" className="bg-green-600 text-white py-3 px-4 rounded-md flex justify-center items-center font-medium text-base">
+              <Link href="/withdraw" className="bg-green-600 text-white py-3 rounded-md flex justify-center items-center font-medium">
                 Rút tiền
               </Link>
             </div>
-            
-            <div className="px-5 pb-6">
-              {!isLoading && user && (
-                <button 
-                  onClick={handleLogout}
-                  className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-md flex justify-center items-center font-medium text-base"
-                >
-                  Đăng xuất
-                </button>
-              )}
-            </div>
-          </div>
+            <button 
+              onClick={handleLogout}
+              className="mx-4 mb-4 bg-white border border-gray-300 text-gray-700 py-3 rounded-md flex justify-center items-center font-medium"
+            >
+              Đăng xuất
+            </button>
+          </nav>
         </div>
-      )}
+      </div>
     </header>
   );
 }
