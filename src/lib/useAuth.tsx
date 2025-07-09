@@ -59,36 +59,42 @@ function useAuthStandalone(): AuthContextType {
     // eslint-disable-next-line
   }, []);
 
-  const checkAuth = async () => {
-    setIsLoading(true);
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      const res = await fetch('/api/auth/me', {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        }
+ const checkAuth = async () => {
+  setIsLoading(true);
+  try {
+    // Lấy token từ localStorage (nếu có)
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    // Gọi API lấy thông tin user, gửi kèm cookie và Authorization header nếu có
+    const res = await fetch('/api/auth/me', {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      }
+    });
+    // Xử lý response
+    if (res.ok) {
+      const data = await res.json().catch(e => {
+        console.error('Error parsing auth response:', e);
+        return null;
       });
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        if (data?.success && data.user) {
-          setUser(data.user);
-        } else {
-          setUser(null);
-        }
+      if (data?.success && data.user) {
+        setUser(data.user);
       } else {
         setUser(null);
       }
-    } catch (error) {
+    } else {
       setUser(null);
-    } finally {
-      setIsLoading(false);
     }
-  };
+  } catch (error) {
+    setUser(null);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const login = async (username: string, password: string) => {
     try {
